@@ -1,86 +1,80 @@
-//
-//  ContentView.swift
-//  BonApp
-//
-//  Created by Marcin on 28/04/2025.
-//
-
 import SwiftUI
 import CoreData
 
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
-
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Item.timestamp, ascending: true)],
-        animation: .default)
-    private var items: FetchedResults<Item>
+    @StateObject private var auth = AuthViewModel()
 
     var body: some View {
-        NavigationView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp!, formatter: itemFormatter)")
-                    } label: {
-                        Text(item.timestamp!, formatter: itemFormatter)
+        let currentUser = auth.currentUser
+        TabView {
+            // Recipes tab
+            RecipeListView()
+                .tabItem { Label("Przepisy", systemImage: "book") }
+            
+            // Pantry tab: show only if authenticated
+            if auth.isAuthenticated, let user = currentUser {
+                PantryView(user: user)
+                    .tabItem { Label("Spiżarnia", systemImage: "tray.fill") }
+                
+                ShoppingListView(user: user)
+                    .tabItem { Label("Zakupy", systemImage: "cart.fill") }
+            } else {
+                // place‐holders to keep tab order
+                EmptyView().tabItem { Label("Spiżarnia", systemImage: "tray.fill") }
+                EmptyView().tabItem { Label("Zakupy", systemImage: "cart.fill") }
+            }
+            
+            // Account tab
+            NavigationStack {
+                if auth.isAuthenticated, let user = currentUser {
+                    ProfileSetupView(user: user)
+                } else {
+                    VStack(spacing: 16) {
+                        NavigationLink(destination: LoginView()) {
+                            Text("Zaloguj")
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .background(Color("login"))
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                                .padding(.horizontal)
+                        }
+                        NavigationLink(destination: RegistrationView()) {
+                            Text("Rejestracja")
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .background(Color("register"))
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                                .padding(.horizontal)
+                        }
                     }
+                    .navigationTitle("Konto")
                 }
-                .onDelete(perform: deleteItems)
             }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
+                    // Always show settings icon; pass currentUser or a new User if nil
+                    NavigationLink(destination: SettingsView(user: auth.currentUser ?? User(context: viewContext))) {
+                        Image(systemName: "gearshape")
                     }
                 }
             }
-            Text("Select an item")
+            .background(Color("background").ignoresSafeArea())
+            .tabItem { Label("Konto", systemImage: "person.crop.circle") }
         }
-    }
-
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(context: viewContext)
-            newItem.timestamp = Date()
-
-            do {
-                try viewContext.save()
-            } catch {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-                let nsError = error as NSError
-                fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
-            }
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            offsets.map { items[$0] }.forEach(viewContext.delete)
-
-            do {
-                try viewContext.save()
-            } catch {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-                let nsError = error as NSError
-                fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
-            }
-        }
+        .environmentObject(auth)
     }
 }
 
-private let itemFormatter: DateFormatter = {
-    let formatter = DateFormatter()
-    formatter.dateStyle = .short
-    formatter.timeStyle = .medium
-    return formatter
-}()
-
-#Preview {
-    ContentView().environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+struct ContentView_Previews: PreviewProvider {
+    static var previews: some View {
+        let context = PersistenceController.shared.container.viewContext
+        // Create a sample user for preview
+        let sampleUser = User(context: context)
+        sampleUser.name = "Jan"
+        sampleUser.email = "jan@example.com"
+        sampleUser.password = "Password1"
+        return ContentView()
+            .environment(\.managedObjectContext, context)
+    }
 }

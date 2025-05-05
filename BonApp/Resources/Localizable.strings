@@ -1,0 +1,46 @@
+
+/* Navigation Titles */
+"Recipes" = "Przepisy";
+"AddRecipe" = "Dodaj przepis";
+"EditRecipe" = "Edytuj przepis";
+"Search" = "Wyszukaj";
+"Pantry" = "Spiżarnia";
+"Recommendations" = "Rekomendacje";
+"ShoppingList" = "Lista zakupów";
+"Login" = "Logowanie";
+"Register" = "Rejestracja";
+
+/* Buttons */
+"Save" = "Zapisz";
+"SaveRecipe" = "Zapisz przepis";
+"SaveChanges" = "Zapisz zmiany";
+"SelectImage" = "Wybierz zdjęcie";
+"Cancel" = "Anuluj";
+
+/* Placeholders */
+"TitlePlaceholder" = "Tytuł";
+"DetailPlaceholder" = "Opis";
+"IngredientsPlaceholder" = "Składniki";
+"CookTimePlaceholder" = "Czas przygotowania";
+
+/* Section Headers */
+"BasicSection" = "Podstawowe";
+"PhotoSection" = "Zdjęcie";
+"IngredientsSection" = "Składniki (oddzielone przecinkami)";
+"CookTimeSection" = "Czas przygotowania (minuty)";
+
+/* Labels */
+"IngredientsHeader" = "Składniki";
+"CookTimeLabel" = "Czas przygotowania:";
+"Favorites" = "Ulubione";
+
+/* Alerts */
+"InvalidEmail" = "Nieprawidłowy format e-mail.";
+"WeakPassword" = "Hasło musi mieć minimum 8 znaków, w tym literę i cyfrę.";
+
+/* Search Prompt */
+"SearchRecipes" = "Szukaj przepisów";
+
+/* Launch Screen */
+"WelcomeMessage" = "Witamy w BonApp!";
+

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="23788" systemVersion="24E263" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithSwiftData="YES" userDefinedModelVersionIdentifier="">
+    <entity name="PantryItem" representedClassName="PantryItem" syncable="YES">
+        <attribute name="category" attributeType="String"/>
+        <attribute name="name" attributeType="String"/>
+        <attribute name="quantity" attributeType="String"/>
+        <relationship name="owner" maxCount="1" deletionRule="Nullify" destinationEntity="User" inverseName="pantryItems" inverseEntity="User"/>
+    </entity>
+    <entity name="Recipe" representedClassName="Recipe" syncable="YES">
+        <attribute name="cookTime" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="detail" attributeType="String"/>
+        <attribute name="images" optional="YES" attributeType="Binary"/>
+        <attribute name="ingredients" attributeType="Transformable" valueTransformerName="NSSecureUnarchiveFromData" customClassName="NSArray"/>
+        <attribute name="isPublic" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="title" attributeType="String"/>
+        <relationship name="author" maxCount="1" deletionRule="Nullify" destinationEntity="User" inverseName="recipes" inverseEntity="User"/>
+        <relationship name="favoritedBy" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="User" inverseName="favoriteRecipes" inverseEntity="User"/>
+        <relationship name="steps" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="RecipeStep" inverseName="recipe" inverseEntity="RecipeStep"/>
+    </entity>
+    <entity name="RecipeStep" representedClassName="RecipeStep" syncable="YES">
+        <attribute name="instruction" attributeType="String"/>
+        <attribute name="order" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <relationship name="recipe" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Recipe" inverseName="steps" inverseEntity="Recipe"/>
+    </entity>
+    <entity name="ShoppingListItem" representedClassName="ShoppingListItem" syncable="YES">
+        <attribute name="isBought" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="name" attributeType="String"/>
+        <attribute name="quantity" attributeType="String"/>
+        <relationship name="owner" maxCount="1" deletionRule="Nullify" destinationEntity="User" inverseName="shoppingListItems" inverseEntity="User"/>
+    </entity>
+    <entity name="User" representedClassName="User" syncable="YES">
+        <attribute name="avatarColorHex" optional="YES" attributeType="String"/>
+        <attribute name="email" attributeType="String"/>
+        <attribute name="name" optional="YES" attributeType="String"/>
+        <attribute name="password" attributeType="String"/>
+        <attribute name="preferences" optional="YES" attributeType="String"/>
+        <relationship name="favoriteRecipes" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Recipe" inverseName="favoritedBy" inverseEntity="Recipe"/>
+        <relationship name="pantryItems" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="PantryItem" inverseName="owner" inverseEntity="PantryItem"/>
+        <relationship name="recipes" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Recipe" inverseName="author" inverseEntity="Recipe"/>
+        <relationship name="shoppingListItems" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="ShoppingListItem" inverseName="owner" inverseEntity="ShoppingListItem"/>
+    </entity>
+</model>
