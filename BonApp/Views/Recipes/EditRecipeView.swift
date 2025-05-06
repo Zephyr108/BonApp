@@ -40,74 +40,188 @@ struct EditRecipeView: View {
     }
 
     var body: some View {
-        Form {
-            Section(header: Text("Podstawowe")) {
-                TextField("Tytuł", text: $title)
-                TextField("Opis", text: $detail)
-                Toggle("Publiczny", isOn: $isPublic)
-            }
-            Section(header: Text("Zdjęcie")) {
-                if let image = selectedImage {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFit()
+        ScrollView {
+            VStack(spacing: 16) {
+                Group {
+                    Text("Podstawowe")
+                        .font(.headline)
+                        .foregroundColor(Color("textSecondary"))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    TextField("Tytuł", text: $title)
+                        .foregroundColor(Color("textPrimary"))
+                        .padding(16)
+                        //.frame(height: 44)
+                        .background(Color("textfieldBackground"))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
                         .cornerRadius(8)
+
+                    TextField("Opis", text: $detail)
+                        .foregroundColor(Color("textPrimary"))
+                        .padding(16)
+                        //.frame(height: 44)
+                        .background(Color("textfieldBackground"))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
+                        .cornerRadius(8)
+
                     HStack {
-                        Button("Zmień zdjęcie") {
-                            isShowingImagePicker = true
-                        }
+                        Text("Publiczny")
+                            .foregroundColor(Color("textPrimary"))
                         Spacer()
-                        Button(role: .destructive) {
-                            selectedImage = nil
-                        } label: {
-                            Text("Usuń zdjęcie")
-                        }
+                        Toggle("", isOn: $isPublic)
+                            .labelsHidden()
                     }
-                } else {
-                    Button("Dodaj zdjęcie") {
-                        isShowingImagePicker = true
+                    .padding(12)
+                    .background(Color("textfieldBackground"))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
+                    .cornerRadius(8)
+                }
+
+                Group {
+                    Text("Zdjęcie")
+                        .font(.headline)
+                        .foregroundColor(Color("textSecondary"))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    if let image = selectedImage {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .cornerRadius(8)
+
+                        HStack {
+                            Button("Zmień zdjęcie") {
+                                isShowingImagePicker = true
+                            }
+                            .padding()
+                            .frame(height: 44)
+                            .background(Color("textfieldBackground"))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
+                            .cornerRadius(8)
+
+                            Spacer()
+
+                            Button(role: .destructive) {
+                                selectedImage = nil
+                            } label: {
+                                Text("Usuń zdjęcie")
+                            }
+                            .padding()
+                            .frame(height: 44)
+                            .background(Color("textfieldBackground"))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
+                            .cornerRadius(8)
+                        }
+                    } else {
+                        Button(action: { isShowingImagePicker = true }) {
+                            HStack {
+                                Label("Dodaj zdjęcie", systemImage: "photo")
+                                Spacer()
+                            }
+                        }
+                        .padding()
+                        //.frame(height: 44)
+                        .foregroundColor(.blue)
+                        .background(Color("textfieldBackground"))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
+                        .cornerRadius(8)
                     }
                 }
-            }
-            .sheet(isPresented: $isShowingImagePicker) {
-                ImagePicker(image: $selectedImage)
-            }
-            Section(header: Text("Składniki (oddzielone przecinkami)")) {
-                TextField("Składniki", text: $ingredientsText)
-            }
-            Section(header: Text("Czas przygotowania (minuty)")) {
-                TextField("Czas", text: $cookTime)
-                    .keyboardType(.numberPad)
-            }
-            Section(header: Text("Kroki")) {
-                // Editable list of existing steps
-                ForEach(stepTexts.indices, id: \.self) { idx in
+
+                Group {
+                    Text("Składniki (oddzielone przecinkami)")
+                        .font(.headline)
+                        .foregroundColor(Color("textSecondary"))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    TextField("Składniki", text: $ingredientsText)
+                        .foregroundColor(Color("textPrimary"))
+                        .padding(16)
+                        //.frame(height: 44)
+                        .background(Color("textfieldBackground"))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
+                        .cornerRadius(8)
+                }
+
+                Group {
+                    Text("Czas przygotowania (minuty)")
+                        .font(.headline)
+                        .foregroundColor(Color("textSecondary"))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    TextField("Czas", text: $cookTime)
+                        .keyboardType(.numberPad)
+                        .foregroundColor(Color("textPrimary"))
+                        .padding(16)
+                        //.frame(height: 44)
+                        .background(Color("textfieldBackground"))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
+                        .cornerRadius(8)
+                }
+
+                Group {
+                    Text("Kroki")
+                        .font(.headline)
+                        .foregroundColor(Color("textSecondary"))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    ForEach(stepTexts.indices, id: \.self) { idx in
+                        HStack {
+                            TextField("Krok \(idx+1)", text: $stepTexts[idx])
+                                .padding()
+                                .frame(height: 44)
+                                .background(Color("textfieldBackground"))
+                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
+                                .cornerRadius(8)
+
+                            Button(role: .destructive) {
+                                stepTexts.remove(at: idx)
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                            .padding()
+                            .frame(height: 44)
+                            .background(Color("textfieldBackground"))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
+                            .cornerRadius(8)
+                        }
+                    }
+
                     HStack {
-                        TextField("Krok \(idx+1)", text: $stepTexts[idx])
-                        Button(role: .destructive) {
-                            stepTexts.remove(at: idx)
-                        } label: {
-                            Image(systemName: "trash")
+                        TextField("Nowy krok", text: $newStepText)
+                            .padding()
+                            .background(Color("textfieldBackground"))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
+                            .cornerRadius(8)
+
+                        Button("Dodaj krok") {
+                            let text = newStepText.trimmingCharacters(in: .whitespacesAndNewlines)
+                            guard !text.isEmpty else { return }
+                            stepTexts.append(text)
+                            newStepText = ""
                         }
+                        .disabled(newStepText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        //.foregroundColor(Color("textPrimary"))
+                        .padding()
+                        .background(Color("addStep"))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
+                        .cornerRadius(8)
                     }
                 }
-                // Input for a new step
-                HStack {
-                    TextField("Nowy krok", text: $newStepText)
-                    Button("Dodaj krok") {
-                        let text = newStepText.trimmingCharacters(in: .whitespacesAndNewlines)
-                        guard !text.isEmpty else { return }
-                        stepTexts.append(text)
-                        newStepText = ""
-                    }
-                    .disabled(newStepText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-            }
-            Section {
+
                 Button("Zapisz zmiany") {
                     saveChanges()
                 }
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(Color("edit"))
+                .foregroundColor(Color("textPrimary"))
+                .cornerRadius(8)
             }
+            .padding()
+        }
+        .background(Color("background").ignoresSafeArea())
+        .sheet(isPresented: $isShowingImagePicker) {
+            ImagePicker(image: $selectedImage)
         }
         .navigationTitle("Edytuj przepis")
     }

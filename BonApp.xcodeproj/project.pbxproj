@@ -207,11 +207,12 @@
 				};
 			};
 			buildConfigurationList = D3D458D22DBFEB1E001C706B /* Build configuration list for PBXProject "BonApp" */;
-			developmentRegion = en;
+			developmentRegion = pl;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
 				Base,
+				pl,
 			);
 			mainGroup = D3D458CE2DBFEB1E001C706B;
 			minimizedProjectReferenceProxies = 1;

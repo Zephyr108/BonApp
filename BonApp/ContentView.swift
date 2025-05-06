@@ -33,24 +33,26 @@ struct ContentView: View {
                     VStack(spacing: 16) {
                         NavigationLink(destination: LoginView()) {
                             Text("Zaloguj")
+                                .foregroundColor(Color("textPrimary"))
                                 .frame(maxWidth: .infinity, minHeight: 44)
                                 .background(Color("login"))
-                                .foregroundColor(.white)
                                 .cornerRadius(8)
                                 .padding(.horizontal)
                         }
                         NavigationLink(destination: RegistrationView()) {
                             Text("Rejestracja")
+                                .foregroundColor(Color("textPrimary"))
                                 .frame(maxWidth: .infinity, minHeight: 44)
                                 .background(Color("register"))
-                                .foregroundColor(.white)
                                 .cornerRadius(8)
                                 .padding(.horizontal)
                         }
                     }
+                    .background(Color("background").ignoresSafeArea())
                     .navigationTitle("Konto")
                 }
             }
+            .background(Color("background").ignoresSafeArea())
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     // Always show settings icon; pass currentUser or a new User if nil
@@ -59,10 +61,10 @@ struct ContentView: View {
                     }
                 }
             }
-            .background(Color("background").ignoresSafeArea())
             .tabItem { Label("Konto", systemImage: "person.crop.circle") }
         }
         .environmentObject(auth)
+        .background(Color("background").ignoresSafeArea())
     }
 }
 

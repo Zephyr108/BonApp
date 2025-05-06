@@ -27,7 +27,7 @@ struct AddRecipeView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 24) {
+                VStack(spacing: 16) {
 
                     Group {
                         Text("Podstawowe")
@@ -37,14 +37,14 @@ struct AddRecipeView: View {
 
                         TextField("Tytuł", text: $title)
                             .foregroundColor(Color("textPrimary"))
-                            .padding(10)
+                            .padding(16)
                             .background(Color("textfieldBackground"))
                             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
                             .cornerRadius(8)
 
                         TextField("Opis", text: $detail)
                             .foregroundColor(Color("textPrimary"))
-                            .padding(10)
+                            .padding(16)
                             .background(Color("textfieldBackground"))
                             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
                             .cornerRadius(8)
@@ -56,7 +56,7 @@ struct AddRecipeView: View {
                             Toggle("", isOn: $isPublic)
                                 .labelsHidden()
                         }
-                        .padding(10)
+                        .padding(16)
                         .background(Color("textfieldBackground"))
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
                         .cornerRadius(8)
@@ -83,7 +83,7 @@ struct AddRecipeView: View {
                                     Label("Wybierz zdjęcie", systemImage: "photo")
                                     Spacer()
                                 }
-                                .padding(10)
+                                .padding(16)
                                 .foregroundColor(.blue)
                                 .background(Color("textfieldBackground"))
                                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
@@ -101,7 +101,7 @@ struct AddRecipeView: View {
 
                         TextField("Składniki", text: $ingredientsText)
                             .foregroundColor(Color("textPrimary"))
-                            .padding(10)
+                            .padding(16)
                             .background(Color("textfieldBackground"))
                             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
                             .cornerRadius(8)
@@ -117,7 +117,7 @@ struct AddRecipeView: View {
                         TextField("Czas", text: $cookTime)
                             .keyboardType(.numberPad)
                             .foregroundColor(Color("textPrimary"))
-                            .padding(10)
+                            .padding(16)
                             .background(Color("textfieldBackground"))
                             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
                             .cornerRadius(8)
@@ -138,7 +138,7 @@ struct AddRecipeView: View {
                         HStack {
                             TextField("Nowy krok", text: $newStepText)
                                 .foregroundColor(Color("textPrimary"))
-                                .padding(10)
+                                .padding(16)
                                 .background(Color("textfieldBackground"))
                                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
                                 .cornerRadius(8)
@@ -150,6 +150,10 @@ struct AddRecipeView: View {
                                 newStepText = ""
                             }
                             .disabled(newStepText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            .padding(16)
+                            .background(Color("addStep"))
+                            //.foregroundColor(Color("textPrimary"))
+                            .cornerRadius(8)
                         }
                     }
                     .padding(.bottom, 12)

@@ -36,11 +36,17 @@ struct RecipeListView: View {
         NavigationStack {
             VStack {
                 List {
-                    Section(header: Text("Moje przepisy")) {
+                    Section(header: Text("Moje przepisy")
+                        .foregroundColor(Color("textSecondary"))) {
                         ForEach(myRecipes) { recipe in
                             NavigationLink(destination: RecipeDetailView(recipe: recipe)) {
                                 RecipeRowView(recipe: recipe)
+                                    .padding(8)
+                                    .background(Color("itemsListBackground"))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
                             }
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
                             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                 Button(role: .destructive) {
                                     deleteRecipe(recipe)
@@ -50,14 +56,23 @@ struct RecipeListView: View {
                             }
                         }
                     }
-                    Section(header: Text("Przepisy użytkowników")) {
+                    Section(header: Text("Przepisy użytkowników")
+                        .foregroundColor(Color("textSecondary"))) {
                         ForEach(otherRecipes) { recipe in
                             NavigationLink(destination: RecipeDetailView(recipe: recipe)) {
                                 RecipeRowView(recipe: recipe)
+                                    .padding(8)
+                                    .background(Color("itemsListBackground"))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
                             }
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
                         }
                     }
                 }
+                .scrollContentBackground(.hidden)
+                .listStyle(PlainListStyle())
+                .background(Color("background"))
                 HStack {
                     Spacer()
                     NavigationLink(destination: RecipeSearchView()) {
@@ -67,8 +82,11 @@ struct RecipeListView: View {
                     Spacer()
                 }
                 .padding(.vertical, 8)
+                .background(Color("background"))
             }
+            .background(Color("background").ignoresSafeArea())
             .navigationTitle("Przepisy")
+                .foregroundColor(Color("textPrimary"))
             .toolbar {
                 if auth.isAuthenticated, let user = auth.currentUser {
                     ToolbarItem(placement: .navigationBarTrailing) {
@@ -99,6 +117,14 @@ struct RecipeListView_Previews: PreviewProvider {
         let auth = AuthViewModel(context: context)
         auth.currentUser = User(context: context)
         auth.isAuthenticated = true
+
+        let sampleRecipe = Recipe(context: context)
+        sampleRecipe.title = "Domowy makaron"
+        sampleRecipe.detail = "Prosty przepis na domowy makaron"
+        sampleRecipe.cookTime = 20
+        sampleRecipe.isPublic = true
+        sampleRecipe.author = auth.currentUser
+
         return RecipeListView()
             .environment(\.managedObjectContext, context)
             .environmentObject(auth)

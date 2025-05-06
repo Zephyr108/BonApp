@@ -24,9 +24,12 @@ final class RecommendationsViewModel: ObservableObject {
         let pantryItemsSet = (user.pantryItems as? Set<PantryItem>) ?? []
         let pantrySet: Set<String> = Set(pantryItemsSet.compactMap { $0.name })
 
-        // Fetch all public recipes
+        // Fetch all public recipes and the user's own private recipes
         let request: NSFetchRequest<Recipe> = Recipe.fetchRequest()
-        request.predicate = NSPredicate(format: "isPublic == YES")
+        request.predicate = NSCompoundPredicate(orPredicateWithSubpredicates: [
+            NSPredicate(format: "isPublic == YES"),
+            NSPredicate(format: "author == %@", user)
+        ])
 
         do {
             let allRecipes = try viewContext.fetch(request)

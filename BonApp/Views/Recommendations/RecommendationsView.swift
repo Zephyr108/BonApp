@@ -6,29 +6,50 @@ struct RecommendationsView: View {
     
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Filtry") {
-                    Toggle("Szybkie (≤ 30 min)", isOn: $viewModel.filterQuick)
-                    Toggle("Wegetariańskie", isOn: $viewModel.filterVegetarian)
-                    Toggle("Budżetowe", isOn: $viewModel.filterBudget)
-                    Stepper(value: $viewModel.maxMissingIngredients, in: 0...5) {
-                        Text("Max brakujących składników: \(viewModel.maxMissingIngredients)")
+            ZStack {
+                Color("background").ignoresSafeArea()
+                Form {
+                    Section {
+                        Toggle("Szybkie (≤ 30 min)", isOn: $viewModel.filterQuick)
+                            .tint(Color("accent"))
+                        Toggle("Wegetariańskie", isOn: $viewModel.filterVegetarian)
+                            .tint(Color("accent"))
+                        Toggle("Budżetowe", isOn: $viewModel.filterBudget)
+                            .tint(Color("accent"))
+                        Stepper(value: $viewModel.maxMissingIngredients, in: 0...5) {
+                            Text("Max brakujących składników: \(viewModel.maxMissingIngredients)")
+                                .foregroundColor(Color("textPrimary"))
+                        }
+                        .tint(Color("accent"))
+                    } header: {
+                        Text("Filtry")
+                            .foregroundColor(Color("textSecondary"))
                     }
-                }
-                
-                Section("Rekomendacje") {
-                    if viewModel.recommendations.isEmpty {
-                        Text("Brak rekomendacji dla obecnych filtrów i zawartości spiżarni.")
-                            .foregroundColor(.secondary)
-                    } else {
-                        List(viewModel.recommendations, id: \.self) { recipe in
-                            NavigationLink(destination: RecipeDetailView(recipe: recipe)) {
-                                RecipeRowView(recipe: recipe)
+                    
+                    Section {
+                        if viewModel.recommendations.isEmpty {
+                            Text("Brak rekomendacji dla obecnych filtrów i zawartości spiżarni.")
+                                .foregroundColor(Color("textSecondary"))
+                                .padding(8)
+                                .background(Color("itemsListBackground"))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                        } else {
+                            List(viewModel.recommendations, id: \.self) { recipe in
+                                NavigationLink(destination: RecipeDetailView(recipe: recipe)) {
+                                    RecipeRowView(recipe: recipe)
+                                        .padding(8)
+                                        .background(Color("itemsListBackground"))
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                }
                             }
                         }
-                        .listStyle(.plain)
+                    } header: {
+                        Text("Rekomendacje")
+                            .foregroundColor(Color("textSecondary"))
                     }
                 }
+                .scrollContentBackground(.hidden)
+                .listStyle(.plain)
             }
             .navigationTitle("Rekomendacje")
             .toolbar {
@@ -56,7 +77,10 @@ struct RecommendationsView_Previews: PreviewProvider {
         samplePantry.quantity = "1 kg"
         samplePantry.category = "Pieczywo"
         samplePantry.owner = user
-        return RecommendationsView(user: user)
-            .environment(\.managedObjectContext, context)
+        return ZStack {
+            Color("background").ignoresSafeArea()
+            RecommendationsView(user: user)
+                .environment(\.managedObjectContext, context)
+        }
     }
 }

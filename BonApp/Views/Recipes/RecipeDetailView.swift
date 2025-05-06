@@ -24,49 +24,58 @@ struct RecipeDetailView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                // Display recipe image if available
-                if let imageData = recipe.images, let uiImage = UIImage(data: imageData) {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .scaledToFit()
-                        .cornerRadius(8)
-                }
-                
-                // Title and cook time
-                Text(recipe.title ?? "Brak tytułu")
-                    .font(.title)
-                    .bold()
-                Text("Czas przygotowania: \(recipe.cookTime) min")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                
-                // Description
-                if let detail = recipe.detail {
-                    Text(detail)
-                        .font(.body)
-                }
-                
-                Divider()
-                
-                // Ingredients list
-                Text("Składniki")
-                    .font(.headline)
-                ForEach(ingredientsArray, id: \.self) { ingredient in
-                    Text("• \(ingredient)")
-                }
+        ZStack {
+            Color("background").ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Display recipe image if available
+                    if let imageData = recipe.images, let uiImage = UIImage(data: imageData) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFit()
+                            .cornerRadius(8)
+                    }
+                    
+                    // Title and cook time
+                    Text(recipe.title ?? "Brak tytułu")
+                        .font(.title)
+                        .bold()
+                        .foregroundColor(Color("textPrimary"))
+                    Text("Czas przygotowania: \(recipe.cookTime) min")
+                        .font(.subheadline)
+                        .foregroundColor(Color("textSecondary"))
+                    
+                    // Description
+                    if let detail = recipe.detail {
+                        Text(detail)
+                            .font(.body)
+                            .foregroundColor(Color("textPrimary"))
+                    }
+                    
+                    Divider()
+                    
+                    // Ingredients list
+                    Text("Składniki")
+                        .font(.headline)
+                        .foregroundColor(Color("textSecondary"))
+                    ForEach(ingredientsArray, id: \.self) { ingredient in
+                        Text("• \(ingredient)")
+                            .foregroundColor(Color("textPrimary"))
+                    }
 
-                Divider()
+                    Divider()
 
-                // Steps list
-                Text("Kroki")
-                    .font(.headline)
-                ForEach(stepsArray, id: \.self) { step in
-                    Text("Krok \(step.order): \(step.instruction ?? "")")
+                    // Steps list
+                    Text("Kroki")
+                        .font(.headline)
+                        .foregroundColor(Color("textSecondary"))
+                    ForEach(stepsArray, id: \.self) { step in
+                        Text("Krok \(step.order): \(step.instruction ?? "")")
+                            .foregroundColor(Color("textPrimary"))
+                    }
                 }
+                .padding()
             }
-            .padding()
         }
         .navigationTitle("Szczegóły przepisu")
         .navigationBarTitleDisplayMode(.inline)
@@ -95,6 +104,7 @@ struct RecipeDetailView_Previews: PreviewProvider {
         return NavigationStack {
             RecipeDetailView(recipe: sample)
                 .environment(\.managedObjectContext, context)
+                .environmentObject(AuthViewModel())
         }
     }
 }
