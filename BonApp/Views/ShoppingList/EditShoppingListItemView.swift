@@ -17,21 +17,47 @@ struct EditShoppingListItemView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section(header: Text("Nazwa produktu")) {
-                    TextField("Nazwa", text: $name)
-                }
-                Section(header: Text("Ilość")) {
-                    TextField("Ilość", text: $quantity)
-                        .keyboardType(.decimalPad)
-                }
-                Section {
+            ZStack {
+                Color("background").ignoresSafeArea()
+                VStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Nazwa produktu")
+                            .foregroundColor(Color("textPrimary"))
+                        TextField("Nazwa", text: $name)
+                            .padding()
+                            .background(Color("textfieldBackground"))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color("textfieldBorder"))
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Ilość")
+                            .foregroundColor(Color("textPrimary"))
+                        TextField("Ilość", text: $quantity)
+                            .keyboardType(.decimalPad)
+                            .padding()
+                            .background(Color("textfieldBackground"))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color("textfieldBorder"))
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
                     Button("Zapisz zmiany") {
                         saveChanges()
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color("edit"))
+                    .foregroundColor(Color("buttonText"))
+                    .cornerRadius(8)
                     .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty ||
                               quantity.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
+                .frame(maxHeight: .infinity, alignment: .top)
+                .padding()
             }
             .navigationTitle("Edytuj pozycję listy zakupów")
             .navigationBarTitleDisplayMode(.inline)

@@ -164,7 +164,7 @@ struct AddRecipeView: View {
                     .disabled(title.isEmpty || ingredientsText.isEmpty || Int(cookTime) == nil)
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .background(Color("edit"))
-                    .foregroundColor(Color("textPrimary"))
+                    .foregroundColor(Color("buttonText"))
                     .cornerRadius(8)
                 }
                 .padding()

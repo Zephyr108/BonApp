@@ -71,7 +71,7 @@ struct EditPantryItemView: View {
                     .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || quantity.trimmingCharacters(in: .whitespaces).isEmpty)
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .background(Color("edit"))
-                    .foregroundColor(Color("textPrimary"))
+                    .foregroundColor(Color("buttonText"))
                     .cornerRadius(8)
                 }
                 .padding()

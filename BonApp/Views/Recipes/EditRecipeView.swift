@@ -214,7 +214,7 @@ struct EditRecipeView: View {
                 }
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .background(Color("edit"))
-                .foregroundColor(Color("textPrimary"))
+                .foregroundColor(Color("buttonText"))
                 .cornerRadius(8)
             }
             .padding()

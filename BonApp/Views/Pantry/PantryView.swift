@@ -5,6 +5,8 @@ struct PantryView: View {
     @ObservedObject var user: User
     @StateObject private var viewModel: PantryViewModel
     @State private var isShowingAdd = false
+    @State private var selectedItems: Set<PantryItem> = []
+    @State private var isSelecting = false
 
     init(user: User) {
         self.user = user
@@ -16,54 +18,100 @@ struct PantryView: View {
             ZStack {
                 Color("background").ignoresSafeArea()
                 
-                ScrollView {
-                    VStack(spacing: 16) {
-                        if viewModel.pantryItems.isEmpty {
-                            Text("Brak produktów w spiżarni.")
-                                .foregroundColor(Color("textSecondary"))
-                                .padding()
-                        } else {
-                            ForEach(viewModel.pantryItems, id: \.self) { item in
-                                NavigationLink(destination: EditPantryItemView(item: item)) {
-                                    HStack {
-                                        VStack(alignment: .leading) {
-                                            Text(item.name ?? "")
-                                                .font(.headline)
-                                                .foregroundColor(Color("textPrimary"))
-                                            Text(item.quantity ?? "")
-                                                .font(.subheadline)
-                                                .foregroundColor(Color("textSecondary"))
-                                        }
-                                        Spacer()
-                                    }
-                                    .padding()
-                                    .background(Color("textfieldBackground"))
-                                    .cornerRadius(8)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .stroke(Color("textfieldBorder"), lineWidth: 1)
-                                    )
+                List(selection: $selectedItems) {
+                    if viewModel.pantryItems.isEmpty {
+                        Text("Brak produktów w spiżarni.")
+                            .foregroundColor(Color("textSecondary"))
+                            .padding()
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                    } else {
+                        ForEach(viewModel.pantryItems, id: \.self) { item in
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(item.name ?? "")
+                                        .font(.headline)
+                                        .foregroundColor(Color("textPrimary"))
+                                    Text(item.quantity ?? "")
+                                        .font(.subheadline)
+                                        .foregroundColor(Color("textSecondary"))
                                 }
-                                .contextMenu {
-                                    Button(role: .destructive) {
-                                        if let index = viewModel.pantryItems.firstIndex(of: item) {
-                                            deleteItems(offsets: IndexSet(integer: index))
-                                        }
-                                    } label: {
-                                        Label("Usuń", systemImage: "trash")
+                                Spacer()
+                            }
+                            .padding()
+                            .background(Color("textfieldBackground"))
+                            .cornerRadius(8)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color("textfieldBorder"), lineWidth: 1)
+                            )
+                            .onTapGesture {
+                                if isSelecting {
+                                    if selectedItems.contains(item) {
+                                        selectedItems.remove(item)
+                                    } else {
+                                        selectedItems.insert(item)
                                     }
                                 }
                             }
+                            .onLongPressGesture {
+                                isSelecting = true
+                                selectedItems.insert(item)
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    if let index = viewModel.pantryItems.firstIndex(of: item) {
+                                        deleteItems(offsets: IndexSet(integer: index))
+                                    }
+                                } label: {
+                                    Label("Usuń", systemImage: "trash")
+                                }
+                            }
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
                         }
                     }
-                    .padding()
                 }
+                .environment(\.editMode, .constant(isSelecting ? EditMode.active : EditMode.inactive))
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background(Color("background"))
             }
             .navigationTitle("Spiżarnia")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { isShowingAdd = true }) {
                         Image(systemName: "plus")
+                    }
+                }
+                ToolbarItemGroup(placement: .bottomBar) {
+                    if isSelecting {
+                        Button(action: {
+                            selectedItems.forEach { viewModel.deleteItem($0) }
+                            selectedItems.removeAll()
+                            isSelecting = false
+                        }) {
+                            Text("Usuń zaznaczone")
+                                .foregroundColor(Color("buttonText"))
+                                .padding(.horizontal)
+                                .padding(.vertical, 8)
+                                .background(Color("edit"))
+                                .cornerRadius(8)
+                        }
+
+                        Spacer()
+
+                        Button(action: {
+                            selectedItems.removeAll()
+                            isSelecting = false
+                        }) {
+                            Text("Anuluj")
+                                .foregroundColor(Color("buttonText"))
+                                .padding(.horizontal)
+                                .padding(.vertical, 8)
+                                .background(Color("cancel"))
+                                .cornerRadius(8)
+                        }
                     }
                 }
             }

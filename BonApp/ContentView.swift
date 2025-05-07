@@ -30,25 +30,27 @@ struct ContentView: View {
                 if auth.isAuthenticated, let user = currentUser {
                     ProfileSetupView(user: user)
                 } else {
-                    VStack(spacing: 16) {
-                        NavigationLink(destination: LoginView()) {
-                            Text("Zaloguj")
-                                .foregroundColor(Color("textPrimary"))
-                                .frame(maxWidth: .infinity, minHeight: 44)
-                                .background(Color("login"))
-                                .cornerRadius(8)
-                                .padding(.horizontal)
-                        }
-                        NavigationLink(destination: RegistrationView()) {
-                            Text("Rejestracja")
-                                .foregroundColor(Color("textPrimary"))
-                                .frame(maxWidth: .infinity, minHeight: 44)
-                                .background(Color("register"))
-                                .cornerRadius(8)
-                                .padding(.horizontal)
+                    ZStack {
+                        Color("background").ignoresSafeArea()
+                        VStack(spacing: 16) {
+                            NavigationLink(destination: LoginView()) {
+                                Text("Zaloguj")
+                                    .foregroundColor(Color("buttonText"))
+                                    .frame(maxWidth: .infinity, minHeight: 44)
+                                    .background(Color("login"))
+                                    .cornerRadius(8)
+                                    .padding(.horizontal)
+                            }
+                            NavigationLink(destination: RegistrationView()) {
+                                Text("Rejestracja")
+                                    .foregroundColor(Color("buttonText"))
+                                    .frame(maxWidth: .infinity, minHeight: 44)
+                                    .background(Color("register"))
+                                    .cornerRadius(8)
+                                    .padding(.horizontal)
+                            }
                         }
                     }
-                    .background(Color("background").ignoresSafeArea())
                     .navigationTitle("Konto")
                 }
             }

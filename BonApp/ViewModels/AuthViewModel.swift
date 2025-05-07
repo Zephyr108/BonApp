@@ -69,6 +69,7 @@ final class AuthViewModel: ObservableObject {
         newUser.password = password
         newUser.name = name
         newUser.preferences = preferences
+        newUser.avatarColorHex = "#000000"
         
         do {
             try viewContext.save()
@@ -77,6 +78,48 @@ final class AuthViewModel: ObservableObject {
         } catch {
             viewContext.delete(newUser)
             errorMessage = "Registration failed: \(error.localizedDescription)"
+        }
+    }
+    
+    // MARK: - Update Profile
+    /// Updates the current user's name, preferences, avatarColorHex, email, and password.
+    func updateProfile(name: String, preferences: String, avatarColorHex: String, email: String, password: String) {
+        guard let user = currentUser else {
+            errorMessage = "No authenticated user."
+            return
+        }
+        
+        guard Validators.isValidEmail(email) else {
+            errorMessage = "InvalidEmail"
+            return
+        }
+        guard Validators.isValidPassword(password) else {
+            errorMessage = "WeakPassword"
+            return
+        }
+        guard Validators.isNonEmpty(name) else {
+            errorMessage = "Name cannot be empty"
+            return
+        }
+
+        user.name = name
+        user.preferences = preferences.isEmpty ? nil : preferences
+        user.avatarColorHex = avatarColorHex
+        user.email = email
+        user.password = password
+
+        do {
+            print("User object state before save: email=\(user.email ?? "nil"), password=\(user.password ?? "nil"), name=\(user.name ?? "nil"), preferences=\(user.preferences ?? "nil"), avatarColorHex=\(user.avatarColorHex ?? "nil")")
+            try viewContext.save()
+        } catch let error as NSError {
+            if let detailedErrors = error.userInfo[NSDetailedErrorsKey] as? [NSError] {
+                for detailedError in detailedErrors {
+                    print("Validation error: \(detailedError), \(detailedError.userInfo)")
+                }
+            } else {
+                print("Single validation error: \(error), \(error.userInfo)")
+            }
+            errorMessage = "Failed to save profile: \(error.localizedDescription)"
         }
     }
     

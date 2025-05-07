@@ -20,17 +20,28 @@ struct ShoppingListView: View {
                         .buttonStyle(PlainButtonStyle())
                         
                         NavigationLink(destination: EditShoppingListItemView(item: item)) {
-                            VStack(alignment: .leading) {
+                            VStack(alignment: .leading, spacing: 8) {
                                 Text(item.name ?? "")
+                                    .font(.headline)
+                                    .foregroundColor(Color("textPrimary"))
                                 Text(item.quantity ?? "")
                                     .font(.subheadline)
-                                    .foregroundColor(.secondary)
+                                    .foregroundColor(Color("textSecondary"))
                             }
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color("itemsListBackground"))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
                     }
                 }
                 .onDelete(perform: deleteItems)
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
             }
+            .scrollContentBackground(.hidden)
+            .listStyle(.plain)
+            .background(Color("background").ignoresSafeArea())
             .navigationTitle("Lista zakupów")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {

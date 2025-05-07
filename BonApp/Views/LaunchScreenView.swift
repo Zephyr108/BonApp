@@ -3,24 +3,31 @@ import CoreData
 
 struct LaunchScreenView: View {
     @State private var isActive = false
+    var preview: Bool = false
     @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.colorScheme) var colorScheme
 
     var body: some View {
-        Group {
-            if isActive {
-                ContentView()
-            } else {
-                VStack {
-                    Image("AppLogoBlack")
-                        .resizable()
-                        .scaledToFit()
+        ZStack {
+            Color("background").ignoresSafeArea()
+            Group {
+                if isActive {
+                    ContentView()
+                } else {
+                    VStack {
+                        Image(colorScheme == .dark ? "AppLogoWhite" : "AppLogoBlack")
+                            .resizable()
+                            .scaledToFit()
+                    }
                 }
             }
         }
         .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                withAnimation {
-                    isActive = true
+            if !preview {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    withAnimation {
+                        isActive = true
+                    }
                 }
             }
         }
@@ -29,7 +36,7 @@ struct LaunchScreenView: View {
 
 struct LaunchScreenView_Previews: PreviewProvider {
     static var previews: some View {
-        LaunchScreenView()
+        LaunchScreenView(preview: true)
             .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
     }
 }

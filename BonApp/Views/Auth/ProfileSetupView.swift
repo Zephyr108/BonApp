@@ -5,6 +5,8 @@
 //  Created by Marcin on 28/04/2025.
 //
 
+import Foundation
+
 import SwiftUI
 import CoreData
 
@@ -17,6 +19,8 @@ struct ProfileSetupView: View {
     @State private var name: String
     @State private var preferences: String
     @State private var avatarColor: Color
+    @State private var email: String
+    @State private var password: String
 
     init(user: User) {
         self.user = user
@@ -27,6 +31,8 @@ struct ProfileSetupView: View {
         } else {
             _avatarColor = State(initialValue: .blue)
         }
+        _email = State(initialValue: user.email ?? "")
+        _password = State(initialValue: user.password ?? "")
     }
 
     var body: some View {
@@ -92,13 +98,41 @@ struct ProfileSetupView: View {
                         )
                         .cornerRadius(8)
 
+                    Text("Email")
+                        .foregroundColor(Color("textSecondary"))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    TextField("Email", text: $email)
+                        .foregroundColor(Color("textPrimary"))
+                        .padding(16)
+                        .background(Color("textfieldBackground"))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color("textfieldBorder"), lineWidth: 1)
+                        )
+                        .cornerRadius(8)
+
+                    Text("Hasło")
+                        .foregroundColor(Color("textSecondary"))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    SecureField("Hasło", text: $password)
+                        .foregroundColor(Color("textPrimary"))
+                        .padding(16)
+                        .background(Color("textfieldBackground"))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color("textfieldBorder"), lineWidth: 1)
+                        )
+                        .cornerRadius(8)
+
                     Button("Zapisz profil") {
                         saveProfile()
                     }
                     .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .background(Color("edit"))
-                    .foregroundColor(Color("textPrimary"))
+                    .foregroundColor(Color("buttonText"))
                     .cornerRadius(8)
 
                     Button("Wyloguj") {
@@ -106,7 +140,7 @@ struct ProfileSetupView: View {
                     }
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .background(Color("logout"))
-                    .foregroundColor(Color("textPrimary"))
+                    .foregroundColor(Color("buttonText"))
                     .cornerRadius(8)
                 }
                 .padding()
@@ -117,15 +151,40 @@ struct ProfileSetupView: View {
         }
     }
 
+    let NSValidationErrorKey = "NSValidationErrorKey"
+
     private func saveProfile() {
         user.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         user.preferences = preferences.trimmingCharacters(in: .whitespacesAndNewlines)
         user.avatarColorHex = avatarColor.toHex()
+        user.email = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        user.password = password.trimmingCharacters(in: .whitespacesAndNewlines)
+
         do {
+            guard !(user.email?.isEmpty ?? true), !(user.password?.isEmpty ?? true) else {
+                print("Email i hasło są wymagane.")
+                return
+            }
+
+            if user.managedObjectContext == nil {
+                viewContext.insert(user)
+            }
+
+            try viewContext.obtainPermanentIDs(for: [user])
             try viewContext.save()
             dismiss()
-        } catch {
-            print("Błąd zapisu profilu: \(error.localizedDescription)")
+        } catch let nsError as NSError {
+            if let detailedErrors = nsError.userInfo[NSDetailedErrorsKey] as? [NSError] {
+                for detailedError in detailedErrors {
+                    if let key = detailedError.userInfo[NSValidationErrorKey] {
+                        print("Walidacja błędu (\(key)): \(detailedError.localizedDescription)")
+                    } else {
+                        print("Szczegółowy błąd zapisu: \(detailedError.localizedDescription)")
+                    }
+                }
+            } else {
+                print("Błąd zapisu profilu: \(nsError), \(nsError.userInfo)")
+            }
         }
     }
 
@@ -143,5 +202,6 @@ struct ProfileSetupView_Previews: PreviewProvider {
         sampleUser.preferences = "Wegetariańskie"
         return ProfileSetupView(user: sampleUser)
             .environment(\.managedObjectContext, context)
+            .environmentObject(AuthViewModel())
     }
 }

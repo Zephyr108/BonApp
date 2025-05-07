@@ -42,7 +42,7 @@ struct LoginView: View {
                     Button("Zaloguj") {
                         auth.login()
                     }
-                    .disabled(!Validators.isValidEmail(auth.email) || auth.password.isEmpty)
+                    .disabled(auth.email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || auth.password.isEmpty)
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .background(Color("login"))
                     .foregroundColor(.white)
