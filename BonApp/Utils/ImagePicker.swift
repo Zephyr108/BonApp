@@ -38,6 +38,5 @@ struct ImagePicker: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {
-        // No dynamic updates needed
     }
 }

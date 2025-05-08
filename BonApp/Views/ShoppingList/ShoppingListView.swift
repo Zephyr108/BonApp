@@ -9,10 +9,14 @@ struct ShoppingListView: View {
     var body: some View {
         NavigationStack {
             List {
-                ForEach(viewModel.items, id: \.self) { item in
+                let items = viewModel.items
+                ForEach(items, id: \.self) { item in
                     HStack {
                         Button(action: {
-                            viewModel.markAsBought(item)
+                            if let index = viewModel.items.firstIndex(of: item) {
+                                viewModel.items[index].isBought.toggle()
+                                viewModel.saveContext()
+                            }
                         }) {
                             Image(systemName: item.isBought ? "checkmark.circle.fill" : "circle")
                                 .foregroundColor(item.isBought ? .green : .primary)

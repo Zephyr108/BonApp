@@ -82,11 +82,16 @@ final class ShoppingListViewModel: ObservableObject {
 
     // MARK: - Helpers
     /// Saves the current context.
-    private func saveContext() {
-        do {
-            try viewContext.save()
-        } catch {
-            print("Failed to save shopping list context: \(error.localizedDescription)")
+    func saveContext() {
+        if viewContext.hasChanges {
+            do {
+                try viewContext.save()
+                // Force refresh of published items to reflect UI updates
+                fetchItems()
+                objectWillChange.send()
+            } catch {
+                print("Failed to save shopping list context: \(error.localizedDescription)")
+            }
         }
     }
 }
