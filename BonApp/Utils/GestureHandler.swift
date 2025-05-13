@@ -66,4 +66,19 @@ struct GestureHandler {
         LongPressGesture(minimumDuration: minimumDuration)
             .onEnded { _ in perform() }
     }
+    
+    /// Creates a double-tap gesture.
+    /// - Parameter perform: called when the double-tap is recognized.
+    /// - Returns: a TapGesture configured for double-taps.
+    static func doubleTapGesture(
+        perform: @escaping () -> Void
+    ) -> some Gesture {
+        TapGesture(count: 2)
+            .onEnded {
+                perform()
+            }
+    }
 }
+
+
+    

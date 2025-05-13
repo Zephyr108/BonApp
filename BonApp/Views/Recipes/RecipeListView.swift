@@ -9,6 +9,8 @@ struct RecipeListView: View {
     private var recipes: FetchedResults<Recipe>
     @EnvironmentObject var auth: AuthViewModel
 
+    @State private var selectedRecipe: Recipe?
+
     /// Only show recipes that are public, or that belong to the current user.
     private var filteredRecipes: [Recipe] {
         recipes.filter { recipe in
@@ -39,11 +41,24 @@ struct RecipeListView: View {
                     Section(header: Text("Moje przepisy")
                         .foregroundColor(Color("textSecondary"))) {
                         ForEach(myRecipes) { recipe in
-                            NavigationLink(destination: RecipeDetailView(recipe: recipe)) {
+                            ZStack {
+                                NavigationLink(value: recipe) {
+                                    EmptyView()
+                                }
+                                .frame(width: 0, height: 0)
+                                .hidden()
+                                
                                 RecipeRowView(recipe: recipe)
                                     .padding(8)
                                     .background(Color("itemsListBackground"))
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        selectedRecipe = recipe
+                                    }
+                                    .onTapGesture(count: 2) {
+                                        toggleFavorite(for: recipe)
+                                    }
                             }
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
@@ -59,11 +74,24 @@ struct RecipeListView: View {
                     Section(header: Text("Przepisy użytkowników")
                         .foregroundColor(Color("textSecondary"))) {
                         ForEach(otherRecipes) { recipe in
-                            NavigationLink(destination: RecipeDetailView(recipe: recipe)) {
+                            ZStack {
+                                NavigationLink(value: recipe) {
+                                    EmptyView()
+                                }
+                                .frame(width: 0, height: 0)
+                                .hidden()
+                                
                                 RecipeRowView(recipe: recipe)
                                     .padding(8)
                                     .background(Color("itemsListBackground"))
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        selectedRecipe = recipe
+                                    }
+                                    .onTapGesture(count: 2) {
+                                        toggleFavorite(for: recipe)
+                                    }
                             }
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
@@ -97,6 +125,9 @@ struct RecipeListView: View {
                 }
             }
         }
+        .navigationDestination(for: Recipe.self) { recipe in
+            RecipeDetailView(recipe: recipe)
+        }
     }
     
     private func deleteRecipe(_ recipe: Recipe) {
@@ -106,6 +137,26 @@ struct RecipeListView: View {
                 try viewContext.save()
             } catch {
                 print("Failed to delete recipe: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    private func toggleFavorite(for recipe: Recipe) {
+        withAnimation {
+            guard let user = auth.currentUser else { return }
+
+            if let favorites = user.favoriteRecipes as? Set<Recipe> {
+                if favorites.contains(recipe) {
+                    user.removeFromFavoriteRecipes(recipe)
+                } else {
+                    user.addToFavoriteRecipes(recipe)
+                }
+
+                do {
+                    try viewContext.save()
+                } catch {
+                    print("Failed to toggle favorite: \(error.localizedDescription)")
+                }
             }
         }
     }

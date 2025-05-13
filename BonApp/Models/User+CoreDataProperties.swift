@@ -25,6 +25,7 @@ extension User {
     @NSManaged public var shoppingListItems: NSSet?
     @NSManaged public var favoriteRecipes: NSSet?
     @NSManaged public var avatarColorHex: String?
+    @NSManaged public var isCurrent: Bool
 
 }
 

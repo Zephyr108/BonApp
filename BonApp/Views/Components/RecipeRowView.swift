@@ -1,7 +1,15 @@
 import SwiftUI
+import CoreData
 
 struct RecipeRowView: View {
     @ObservedObject var recipe: Recipe
+    @Environment(\.managedObjectContext) private var viewContext
+    @FetchRequest(
+        entity: User.entity(),
+        sortDescriptors: [],
+        predicate: NSPredicate(format: "isCurrent == YES"),
+        animation: .default
+    ) private var users: FetchedResults<User>
 
     var body: some View {
         HStack(spacing: 12) {
@@ -22,8 +30,16 @@ struct RecipeRowView: View {
             }
             
             VStack(alignment: .leading, spacing: 4) {
-                Text(recipe.title ?? "Brak tytułu")
-                    .font(.headline)
+                HStack {
+                    Text(recipe.title ?? "Brak tytułu")
+                        .font(.headline)
+                    if let currentUser = users.first,
+                       let favorites = currentUser.favoriteRecipes as? Set<Recipe>,
+                       favorites.contains(recipe) {
+                        Image(systemName: "heart.fill")
+                            .foregroundColor(.red)
+                    }
+                }
                 HStack {
                     Image(systemName: "clock")
                         .font(.subheadline)
@@ -36,6 +52,26 @@ struct RecipeRowView: View {
             Spacer()
         }
         .padding(.vertical, 8)
+        .simultaneousGesture(
+            TapGesture(count: 2)
+                .onEnded {
+                    guard let currentUser = users.first else { return }
+                    if let recipes = currentUser.favoriteRecipes as? Set<Recipe> {
+                        var updatedFavorites = recipes
+                        if recipes.contains(recipe) {
+                            updatedFavorites.remove(recipe)
+                        } else {
+                            updatedFavorites.insert(recipe)
+                        }
+                        currentUser.favoriteRecipes = NSSet(set: updatedFavorites)
+                    }
+                    do {
+                        try viewContext.save()
+                    } catch {
+                        print("Failed to update favorites: \(error.localizedDescription)")
+                    }
+                }
+        )
     }
 }
 

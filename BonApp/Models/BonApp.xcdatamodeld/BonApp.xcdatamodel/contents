@@ -31,6 +31,7 @@
     <entity name="User" representedClassName="User" syncable="YES">
         <attribute name="avatarColorHex" optional="YES" attributeType="String"/>
         <attribute name="email" optional="YES" attributeType="String"/>
+        <attribute name="isCurrent" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
         <attribute name="name" optional="YES" attributeType="String"/>
         <attribute name="password" optional="YES" attributeType="String"/>
         <attribute name="preferences" optional="YES" attributeType="String"/>

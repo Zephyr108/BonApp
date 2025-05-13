@@ -6,7 +6,14 @@ struct ContentView: View {
     @StateObject private var auth = AuthViewModel()
 
     var body: some View {
-        let currentUser = auth.currentUser
+        let fetchedCurrentUser: User? = {
+            let request: NSFetchRequest<User> = User.fetchRequest()
+            request.predicate = NSPredicate(format: "isCurrent == true")
+            request.fetchLimit = 1
+            return (try? viewContext.fetch(request))?.first
+        }()
+        
+        let currentUser = auth.currentUser ?? fetchedCurrentUser
         TabView {
             // Recipes tab
             RecipeListView()

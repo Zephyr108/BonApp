@@ -74,10 +74,27 @@ final class AuthViewModel: ObservableObject {
         do {
             try viewContext.save()
             currentUser = newUser
+            markUserAsCurrent(newUser)
             isAuthenticated = true
         } catch {
             viewContext.delete(newUser)
             errorMessage = "Registration failed: \(error.localizedDescription)"
+        }
+    }
+    
+    /// Marks the given user as the current user, ensuring only one is marked as current
+    func markUserAsCurrent(_ user: User) {
+        let fetchRequest: NSFetchRequest<User> = User.fetchRequest()
+        
+        do {
+            let allUsers = try viewContext.fetch(fetchRequest)
+            for u in allUsers {
+                u.isCurrent = false
+            }
+            user.isCurrent = true
+            try viewContext.save()
+        } catch {
+            print("Failed to mark user as current: \(error.localizedDescription)")
         }
     }
     
@@ -127,7 +144,7 @@ final class AuthViewModel: ObservableObject {
     /// Attempts to log in with the provided email and password.
     func login() {
         errorMessage = nil
-        
+
         // Simple validation
         guard Validators.isValidEmail(email) else {
             errorMessage = "InvalidEmail"
@@ -137,19 +154,25 @@ final class AuthViewModel: ObservableObject {
             errorMessage = "Password cannot be empty"
             return
         }
-        
+
         // Fetch matching user
         let request: NSFetchRequest<User> = User.fetchRequest()
         request.predicate = NSPredicate(format: "email ==[c] %@ AND password == %@", email, password)
         request.fetchLimit = 1
-        
+
         do {
             let results = try viewContext.fetch(request)
             if let user = results.first {
+                // Clear all isCurrent first
+                let allUsers = try viewContext.fetch(User.fetchRequest())
+                for u in allUsers {
+                    u.isCurrent = false
+                }
+
+                user.isCurrent = true
                 currentUser = user
-                // Successful login
                 isAuthenticated = true
-                // Optionally store current user reference if needed
+                try viewContext.save()
             } else {
                 errorMessage = "Invalid email or password"
             }
