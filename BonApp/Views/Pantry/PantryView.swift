@@ -39,7 +39,7 @@ struct PantryView: View {
                                 Spacer()
                             }
                             .padding()
-                            .background(Color("textfieldBackground"))
+                            .background(Color("itemsListBackground"))
                             .cornerRadius(8)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 8)
@@ -131,9 +131,15 @@ struct PantryView: View {
 
 struct PantryView_Previews: PreviewProvider {
     static var previews: some View {
-        let user = User(context: PersistenceController.shared.container.viewContext)
-        // Optionally add pantry items to user for preview
+        let context = PersistenceController.shared.container.viewContext
+        let user = User(context: context)
+
+        let sampleItem = PantryItem(context: context)
+        sampleItem.name = "Makaron"
+        sampleItem.quantity = "2 opakowania"
+        sampleItem.owner = user
+
         return PantryView(user: user)
-            .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
+            .environment(\.managedObjectContext, context)
     }
 }

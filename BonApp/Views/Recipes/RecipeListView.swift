@@ -10,6 +10,7 @@ struct RecipeListView: View {
     @EnvironmentObject var auth: AuthViewModel
 
     @State private var selectedRecipe: Recipe?
+    @State private var isNavigating = false
 
     /// Only show recipes that are public, or that belong to the current user.
     private var filteredRecipes: [Recipe] {
@@ -42,11 +43,15 @@ struct RecipeListView: View {
                         .foregroundColor(Color("textSecondary"))) {
                         ForEach(myRecipes) { recipe in
                             ZStack {
-                                NavigationLink(value: recipe) {
+                                NavigationLink(destination: RecipeDetailView(recipe: recipe), isActive: Binding(
+                                    get: { selectedRecipe == recipe && isNavigating },
+                                    set: { newValue in
+                                        if !newValue { selectedRecipe = nil; isNavigating = false }
+                                    })
+                                ) {
                                     EmptyView()
                                 }
-                                .frame(width: 0, height: 0)
-                                .hidden()
+                                .opacity(0)
                                 
                                 RecipeRowView(recipe: recipe)
                                     .padding(8)
@@ -55,6 +60,7 @@ struct RecipeListView: View {
                                     .contentShape(Rectangle())
                                     .onTapGesture {
                                         selectedRecipe = recipe
+                                        isNavigating = true
                                     }
                                     .onTapGesture(count: 2) {
                                         toggleFavorite(for: recipe)
@@ -75,11 +81,15 @@ struct RecipeListView: View {
                         .foregroundColor(Color("textSecondary"))) {
                         ForEach(otherRecipes) { recipe in
                             ZStack {
-                                NavigationLink(value: recipe) {
+                                NavigationLink(destination: RecipeDetailView(recipe: recipe), isActive: Binding(
+                                    get: { selectedRecipe == recipe && isNavigating },
+                                    set: { newValue in
+                                        if !newValue { selectedRecipe = nil; isNavigating = false }
+                                    })
+                                ) {
                                     EmptyView()
                                 }
-                                .frame(width: 0, height: 0)
-                                .hidden()
+                                .opacity(0)
                                 
                                 RecipeRowView(recipe: recipe)
                                     .padding(8)
@@ -88,6 +98,7 @@ struct RecipeListView: View {
                                     .contentShape(Rectangle())
                                     .onTapGesture {
                                         selectedRecipe = recipe
+                                        isNavigating = true
                                     }
                                     .onTapGesture(count: 2) {
                                         toggleFavorite(for: recipe)
@@ -124,9 +135,6 @@ struct RecipeListView: View {
                     }
                 }
             }
-        }
-        .navigationDestination(for: Recipe.self) { recipe in
-            RecipeDetailView(recipe: recipe)
         }
     }
     

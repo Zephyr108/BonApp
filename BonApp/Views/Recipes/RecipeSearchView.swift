@@ -13,6 +13,7 @@ struct RecipeSearchView: View {
     
     @State private var searchText: String = ""
     @State private var maxCookTime: Double = 60
+    @State private var showOnlyFavorites: Bool = false
     
     // Filtered recipes based on search text and cook time
     private var filteredRecipes: [Recipe] {
@@ -21,7 +22,8 @@ struct RecipeSearchView: View {
                 (recipe.title?.localizedCaseInsensitiveContains(searchText) ?? false)
             let withinTime = recipe.cookTime <= Int16(maxCookTime)
             let isVisible = recipe.isPublic || recipe.author == auth.currentUser
-            return matchesName && withinTime && isVisible
+            let isFavorite = !showOnlyFavorites || (auth.currentUser?.favoriteRecipes?.contains(recipe) ?? false)
+            return matchesName && withinTime && isVisible && isFavorite
         }
     }
 
@@ -39,6 +41,10 @@ struct RecipeSearchView: View {
                 Slider(value: $maxCookTime, in: 0...120, step: 5)
                     .tint(Color("accent"))
                     .padding(.horizontal)
+                
+                Toggle("Pokaż tylko ulubione", isOn: $showOnlyFavorites)
+                    .padding(.horizontal)
+                    .toggleStyle(SwitchToggleStyle(tint: Color("toggleButton")))
                 
                 List {
                     ForEach(filteredRecipes) { recipe in
