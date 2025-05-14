@@ -67,14 +67,18 @@ struct GestureHandler {
             .onEnded { _ in perform() }
     }
     
-    /// Creates a double-tap gesture.
-    /// - Parameter perform: called when the double-tap is recognized.
+    /// Creates a double-tap gesture that only triggers if a User is provided.
+    /// - Parameters:
+    ///   - user: The current user; gesture only triggers if not nil.
+    ///   - perform: called when the double-tap is recognized and user is not nil.
     /// - Returns: a TapGesture configured for double-taps.
     static func doubleTapGesture(
+        user: User?,
         perform: @escaping () -> Void
     ) -> some Gesture {
         TapGesture(count: 2)
             .onEnded {
+                guard user != nil else { return }
                 perform()
             }
     }

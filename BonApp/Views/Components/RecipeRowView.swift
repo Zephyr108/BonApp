@@ -13,7 +13,6 @@ struct RecipeRowView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Thumbnail image if available
             if let imageData = recipe.images, let uiImage = UIImage(data: imageData) {
                 Image(uiImage: uiImage)
                     .resizable()
@@ -22,7 +21,6 @@ struct RecipeRowView: View {
                     .clipped()
                     .cornerRadius(6)
             } else {
-                // Placeholder
                 Rectangle()
                     .fill(Color.secondary.opacity(0.3))
                     .frame(width: 60, height: 60)
@@ -56,15 +54,16 @@ struct RecipeRowView: View {
             TapGesture(count: 2)
                 .onEnded {
                     guard let currentUser = users.first else { return }
-                    if let recipes = currentUser.favoriteRecipes as? Set<Recipe> {
-                        var updatedFavorites = recipes
-                        if recipes.contains(recipe) {
-                            updatedFavorites.remove(recipe)
-                        } else {
-                            updatedFavorites.insert(recipe)
-                        }
-                        currentUser.favoriteRecipes = NSSet(set: updatedFavorites)
+                    guard let favorites = currentUser.favoriteRecipes as? Set<Recipe> else { return }
+
+                    var updatedFavorites = favorites
+                    if updatedFavorites.contains(recipe) {
+                        updatedFavorites.remove(recipe)
+                    } else {
+                        updatedFavorites.insert(recipe)
                     }
+
+                    currentUser.favoriteRecipes = NSSet(set: updatedFavorites)
                     do {
                         try viewContext.save()
                     } catch {

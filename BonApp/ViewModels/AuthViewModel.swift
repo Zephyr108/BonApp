@@ -26,6 +26,7 @@ final class AuthViewModel: ObservableObject {
     
     init(context: NSManagedObjectContext = PersistenceController.shared.container.viewContext) {
         self.viewContext = context
+        clearOldSessions()
     }
     
     // MARK: - Registration
@@ -72,10 +73,10 @@ final class AuthViewModel: ObservableObject {
         newUser.avatarColorHex = "#000000"
         
         do {
-            try viewContext.save()
-            currentUser = newUser
             markUserAsCurrent(newUser)
+            currentUser = newUser
             isAuthenticated = true
+            try viewContext.save()
         } catch {
             viewContext.delete(newUser)
             errorMessage = "Registration failed: \(error.localizedDescription)"
@@ -184,12 +185,37 @@ final class AuthViewModel: ObservableObject {
     // MARK: - Logout
     /// Logs out the current user.
     func logout() {
+        // Fetch all users and reset isCurrent
+        let fetchRequest: NSFetchRequest<User> = User.fetchRequest()
+        do {
+            let users = try viewContext.fetch(fetchRequest)
+            for user in users {
+                user.isCurrent = false
+            }
+            try viewContext.save()
+        } catch {
+            print("Failed to reset isCurrent flags: \(error.localizedDescription)")
+        }
+
+        // Reset state
         isAuthenticated = false
         currentUser = nil
-        // Clear stored fields if desired
         email = ""
         password = ""
         name = ""
         preferences = ""
+    }
+    /// Clears old session by resetting `isCurrent` for all users
+    func clearOldSessions() {
+        let fetchRequest: NSFetchRequest<User> = User.fetchRequest()
+        do {
+            let users = try viewContext.fetch(fetchRequest)
+            for user in users {
+                user.isCurrent = false
+            }
+            try viewContext.save()
+        } catch {
+            print("Failed to clear old sessions: \(error.localizedDescription)")
+        }
     }
 }
