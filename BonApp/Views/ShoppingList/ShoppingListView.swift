@@ -6,23 +6,22 @@ struct ShoppingListView: View {
     @StateObject private var viewModel = ShoppingListViewModel()
     @State private var isShowingAdd = false
 
+
     var body: some View {
         NavigationStack {
             List {
-                let items = viewModel.items
-                ForEach(items, id: \.self) { item in
+                ForEach(viewModel.items.indices, id: \.self) { index in
+                    let item = viewModel.items[index]
                     HStack {
                         Button(action: {
-                            if let index = viewModel.items.firstIndex(of: item) {
-                                viewModel.items[index].isBought.toggle()
-                                viewModel.saveContext()
-                            }
+                            item.isBought.toggle()
+                            viewModel.saveContext()
                         }) {
                             Image(systemName: item.isBought ? "checkmark.circle.fill" : "circle")
                                 .foregroundColor(item.isBought ? .green : .primary)
                         }
                         .buttonStyle(PlainButtonStyle())
-                        
+
                         NavigationLink(destination: EditShoppingListItemView(item: item)) {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text(item.name ?? "")
@@ -53,15 +52,24 @@ struct ShoppingListView: View {
                         Image(systemName: "plus")
                     }
                 }
-            }
-            .sheet(isPresented: $isShowingAdd) {
-                AddShoppingListItemView { name, quantity in
-                    // Provide the current user from environment or context
-                    viewModel.addItem(name: name, quantity: quantity, owner: user)
-                    isShowingAdd = false
+                ToolbarItem(placement: .bottomBar) {
+                    Button("Dodaj do spiżarni") {
+                        viewModel.transferBoughtItemsToPantry(for: user)
+                    }
+                    .foregroundColor(Color("buttonText"))
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    .background(Color("edit"))
+                    .cornerRadius(8)
                 }
             }
-        }
+            .sheet(isPresented: $isShowingAdd) {
+                AddShoppingListItemView { name, quantity, category in
+                    viewModel.addItem(name: name, quantity: quantity, category: category, owner: user)
+                    isShowingAdd = false
+                }
+            }        }
     }
 
     private func deleteItems(offsets: IndexSet) {

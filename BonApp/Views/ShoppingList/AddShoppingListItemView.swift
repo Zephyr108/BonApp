@@ -3,10 +3,11 @@ import SwiftUI
 struct AddShoppingListItemView: View {
     @State private var name: String = ""
     @State private var quantity: String = ""
+    @State private var category: String = ""
     @Environment(\.dismiss) private var dismiss
 
     /// Callback when the user taps the Add button.
-    let onSave: (_ name: String, _ quantity: String) -> Void
+    let onSave: (_ name: String, _ quantity: String, _ category: String) -> Void
 
     var body: some View {
         NavigationStack {
@@ -43,6 +44,18 @@ struct AddShoppingListItemView: View {
                             )
                             .cornerRadius(8)
                     }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Kategoria")
+                            .foregroundColor(Color("textPrimary"))
+                        TextField("Kategoria", text: $category)
+                            .padding(16)
+                            .background(Color("textfieldBackground"))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color("textfieldBorder"), lineWidth: 1)
+                            )
+                            .cornerRadius(8)
+                    }
                     Spacer()
                 }
                 .padding(.horizontal, 16)
@@ -58,7 +71,8 @@ struct AddShoppingListItemView: View {
                     Button("Dodaj") {
                         onSave(
                             name.trimmingCharacters(in: .whitespacesAndNewlines),
-                            quantity.trimmingCharacters(in: .whitespacesAndNewlines)
+                            quantity.trimmingCharacters(in: .whitespacesAndNewlines),
+                            category.trimmingCharacters(in: .whitespacesAndNewlines)
                         )
                         dismiss()
                     }
@@ -75,7 +89,7 @@ struct AddShoppingListItemView: View {
 
 struct AddShoppingListItemView_Previews: PreviewProvider {
     static var previews: some View {
-        AddShoppingListItemView { name, quantity in
+        AddShoppingListItemView { name, quantity, category in
             // preview handler
         }
     }

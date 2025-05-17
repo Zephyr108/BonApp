@@ -38,7 +38,7 @@ struct RecipeSearchView: View {
                 }
                 .padding(.horizontal)
                 
-                Slider(value: $maxCookTime, in: 0...120, step: 5)
+                Slider(value: $maxCookTime, in: 0...150, step: 5)
                     .tint(Color("accent"))
                     .padding(.horizontal)
                 

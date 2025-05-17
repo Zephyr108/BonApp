@@ -2,7 +2,7 @@
 //  ShoppingListItem+CoreDataProperties.swift
 //  BonApp
 //
-//  Created by Marcin on 28/04/2025.
+//  Created by Marcin on 16/05/2025.
 //
 //
 
@@ -16,13 +16,10 @@ extension ShoppingListItem {
         return NSFetchRequest<ShoppingListItem>(entityName: "ShoppingListItem")
     }
 
+    @NSManaged public var category: String?
+    @NSManaged public var isBought: Bool
     @NSManaged public var name: String?
     @NSManaged public var quantity: String?
-    @NSManaged public var isBought: Bool
     @NSManaged public var owner: User?
-
-}
-
-extension ShoppingListItem : Identifiable {
 
 }

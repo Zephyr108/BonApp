@@ -77,6 +77,9 @@ struct PantryView: View {
                 .scrollContentBackground(.hidden)
                 .background(Color("background"))
             }
+            .onAppear {
+                viewModel.refresh()
+            }
             .navigationTitle("Spiżarnia")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {

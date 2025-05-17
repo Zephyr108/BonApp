@@ -4,7 +4,6 @@ import UIKit
 struct ImagePicker: UIViewControllerRepresentable {
     @Binding var image: UIImage?
 
-    // Coordinator to act as UIImagePickerControllerDelegate & UINavigationControllerDelegate
     class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
         let parent: ImagePicker
 

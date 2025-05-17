@@ -34,12 +34,13 @@ final class ShoppingListViewModel: ObservableObject {
 
     // MARK: - Add
     /// Adds a new item to the shopping list.
-    func addItem(name: String, quantity: String, owner: User) {
+    func addItem(name: String, quantity: String, category: String, owner: User) {
         let newItem = ShoppingListItem(context: viewContext)
         newItem.name = name
         newItem.quantity = quantity
         newItem.isBought = false
         newItem.owner = owner
+        newItem.category = category
 
         saveContext()
         fetchItems()
@@ -65,17 +66,9 @@ final class ShoppingListViewModel: ObservableObject {
     }
 
     // MARK: - Mark as Bought
-    /// Marks an item as bought and adds it to the pantry.
+    /// Marks an item as bought.
     func markAsBought(_ item: ShoppingListItem) {
         item.isBought = true
-
-        // Automatically add to pantry
-        let pantryItem = PantryItem(context: viewContext)
-        pantryItem.name = item.name
-        pantryItem.quantity = item.quantity
-        pantryItem.category = "" // Optionally set a default or allow user to edit later
-        pantryItem.owner = item.owner
-
         saveContext()
         fetchItems()
     }
@@ -93,5 +86,24 @@ final class ShoppingListViewModel: ObservableObject {
                 print("Failed to save shopping list context: \(error.localizedDescription)")
             }
         }
+    }
+
+    // MARK: - Add Bought Items to Pantry
+    /// Transfers bought items to pantry and removes them from shopping list.
+    func transferBoughtItemsToPantry(for user: User) {
+        let boughtItems = items.filter { $0.isBought && $0.owner == user }
+
+        for item in boughtItems {
+            let pantryItem = PantryItem(context: viewContext)
+            pantryItem.name = item.name
+            pantryItem.quantity = item.quantity
+            pantryItem.owner = user
+            pantryItem.category = item.category
+
+            viewContext.delete(item)
+        }
+
+        saveContext()
+        fetchItems()
     }
 }

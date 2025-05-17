@@ -23,6 +23,7 @@
         <relationship name="recipe" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Recipe" inverseName="steps" inverseEntity="Recipe"/>
     </entity>
     <entity name="ShoppingListItem" representedClassName="ShoppingListItem" syncable="YES">
+        <attribute name="category" optional="YES" attributeType="String"/>
         <attribute name="isBought" attributeType="Boolean" usesScalarValueType="YES"/>
         <attribute name="name" attributeType="String"/>
         <attribute name="quantity" attributeType="String"/>

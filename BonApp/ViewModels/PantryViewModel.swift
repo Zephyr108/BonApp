@@ -68,6 +68,11 @@ final class PantryViewModel: ObservableObject {
         fetchPantryItems()
     }
 
+    /// Call this to refresh the pantry items from the store.
+    func refresh() {
+        fetchPantryItems()
+    }
+
     // MARK: - Helpers
     /// Saves the current context.
     private func saveContext() {
