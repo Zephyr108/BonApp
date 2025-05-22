@@ -18,7 +18,7 @@ struct ContentView: View {
             RecipeListView()
                 .tabItem { Label("Przepisy", systemImage: "book") }
             
-            // Pantry tab: show only if authenticated
+            // Pantry tab
             if auth.isAuthenticated, let user = currentUser {
                 PantryView(user: user)
                     .tabItem { Label("Spiżarnia", systemImage: "tray.fill") }
@@ -26,7 +26,6 @@ struct ContentView: View {
                 ShoppingListView(user: user)
                     .tabItem { Label("Zakupy", systemImage: "cart.fill") }
             } else {
-                // place‐holders to keep tab order
                 EmptyView().tabItem { Label("Spiżarnia", systemImage: "tray.fill") }
                 EmptyView().tabItem { Label("Zakupy", systemImage: "cart.fill") }
             }
@@ -63,7 +62,6 @@ struct ContentView: View {
             .background(Color("background").ignoresSafeArea())
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    // Always show settings icon; pass currentUser or a new User if nil
                     NavigationLink(destination: SettingsView(user: auth.currentUser ?? User(context: viewContext))) {
                         Image(systemName: "gearshape")
                     }
@@ -79,7 +77,6 @@ struct ContentView: View {
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         let context = PersistenceController.shared.container.viewContext
-        // Create a sample user for preview
         let sampleUser = User(context: context)
         sampleUser.name = "Jan"
         sampleUser.email = "jan@example.com"
