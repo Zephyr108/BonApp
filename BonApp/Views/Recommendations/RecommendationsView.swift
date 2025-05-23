@@ -14,8 +14,6 @@ struct RecommendationsView: View {
                             .tint(Color("accent"))
                         Toggle("Wegetariańskie", isOn: $viewModel.filterVegetarian)
                             .tint(Color("accent"))
-                        Toggle("Budżetowe", isOn: $viewModel.filterBudget)
-                            .tint(Color("accent"))
                         Stepper(value: $viewModel.maxMissingIngredients, in: 0...5) {
                             Text("Max brakujących składników: \(viewModel.maxMissingIngredients)")
                                 .foregroundColor(Color("textPrimary"))

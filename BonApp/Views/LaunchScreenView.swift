@@ -1,3 +1,4 @@
+/*
 import SwiftUI
 import CoreData
 
@@ -40,3 +41,4 @@ struct LaunchScreenView_Previews: PreviewProvider {
             .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
     }
 }
+*/

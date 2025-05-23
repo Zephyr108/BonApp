@@ -14,7 +14,7 @@ struct BonAppApp: App {
 
     var body: some Scene {
         WindowGroup {
-            LaunchScreenView()
+            ContentView()
                 .environment(\.managedObjectContext, persistence.container.viewContext)
         }
     }
