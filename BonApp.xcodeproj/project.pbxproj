@@ -6,10 +6,6 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		D30753452DE11D22000A499C /* Launch Screen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = D30753442DE11D22000A499C /* Launch Screen.storyboard */; };
-/* End PBXBuildFile section */
-
 /* Begin PBXContainerItemProxy section */
 		D3D458EA2DBFEB1F001C706B /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -28,7 +24,6 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		D30753442DE11D22000A499C /* Launch Screen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = "Launch Screen.storyboard"; sourceTree = "<group>"; };
 		D3D458D72DBFEB1E001C706B /* BonApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BonApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D3D458E92DBFEB1F001C706B /* BonAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BonAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D3D458F32DBFEB1F001C706B /* BonAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BonAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -90,7 +85,6 @@
 		D3D458CE2DBFEB1E001C706B = {
 			isa = PBXGroup;
 			children = (
-				D30753442DE11D22000A499C /* Launch Screen.storyboard */,
 				D3E3FCAF2DC21B7900E9066E /* RecipeStep+CoreDataClass.swift */,
 				D3E3FCB02DC21B7900E9066E /* RecipeStep+CoreDataProperties.swift */,
 				D3D459742DBFF35B001C706B /* PantryItem+CoreDataClass.swift */,
@@ -239,7 +233,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				D30753452DE11D22000A499C /* Launch Screen.storyboard in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
