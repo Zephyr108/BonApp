@@ -14,11 +14,9 @@ struct ContentView: View {
             }
         }()
         TabView {
-            // Recipes tab
             RecipeListView()
                 .tabItem { Label("Przepisy", systemImage: "book") }
             
-            // Pantry tab
             if auth.isAuthenticated, let user = currentUser {
                 PantryView(user: user)
                     .tabItem { Label("Spiżarnia", systemImage: "tray.fill") }
@@ -30,7 +28,6 @@ struct ContentView: View {
                 EmptyView().tabItem { Label("Zakupy", systemImage: "cart.fill") }
             }
             
-            // Account tab
             NavigationStack {
                 if auth.isAuthenticated, let user = currentUser {
                     ProfileSetupView(user: user)

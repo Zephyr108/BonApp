@@ -8,20 +8,18 @@
 import Foundation
 import CoreData
 
-/// ViewModel responsible for user authentication and registration.
 final class AuthViewModel: ObservableObject {
-    // MARK: - Published form fields
+    // MARK: - Dane
     @Published var email: String = ""
     @Published var password: String = ""
     @Published var name: String = ""
     @Published var preferences: String = ""
     
-    // MARK: - Published state
+    // MARK: - Statusy
     @Published var isAuthenticated: Bool = false
     @Published var currentUser: User? = nil
     @Published var errorMessage: String? = nil
     
-    // MARK: - Core Data context
     private let viewContext: NSManagedObjectContext
     
     init(context: NSManagedObjectContext = PersistenceController.shared.container.viewContext) {
@@ -29,13 +27,11 @@ final class AuthViewModel: ObservableObject {
         clearOldSessions()
     }
     
-    // MARK: - Registration
-    /// Attempts to register a new user with the provided data.
+    // MARK: - Rejestracja
     func register() {
-        // Clear previous error
         errorMessage = nil
         
-        // Validate inputs
+        //Walidacja
         guard Validators.isValidEmail(email) else {
             errorMessage = "InvalidEmail"
             return
@@ -49,7 +45,7 @@ final class AuthViewModel: ObservableObject {
             return
         }
         
-        // Check if email already exists
+        //Sprawdzenie maila czy nie jest używany
         let request: NSFetchRequest<User> = User.fetchRequest()
         request.predicate = NSPredicate(format: "email ==[c] %@", email)
         
@@ -64,7 +60,7 @@ final class AuthViewModel: ObservableObject {
             return
         }
         
-        // Create new user
+        //Tworzenie uż
         let newUser = User(context: viewContext)
         newUser.email = email
         newUser.password = password
@@ -83,7 +79,7 @@ final class AuthViewModel: ObservableObject {
         }
     }
     
-    /// Marks the given user as the current user, ensuring only one is marked as current
+    //Do oznaczenia danego użytkownika jako obecnego żeby tylko jeden na raz był zalogowany
     func markUserAsCurrent(_ user: User) {
         let fetchRequest: NSFetchRequest<User> = User.fetchRequest()
         
@@ -100,7 +96,7 @@ final class AuthViewModel: ObservableObject {
     }
     
     // MARK: - Update Profile
-    /// Updates the current user's name, preferences, avatarColorHex, email, and password.
+    //Update nazwy, preferencji, avatara, maila
     func updateProfile(name: String, preferences: String, avatarColorHex: String, email: String, password: String) {
         guard let user = currentUser else {
             errorMessage = "No authenticated user."
@@ -142,11 +138,9 @@ final class AuthViewModel: ObservableObject {
     }
     
     // MARK: - Login
-    /// Attempts to log in with the provided email and password.
     func login() {
         errorMessage = nil
 
-        // Simple validation
         guard Validators.isValidEmail(email) else {
             errorMessage = "InvalidEmail"
             return
@@ -156,7 +150,7 @@ final class AuthViewModel: ObservableObject {
             return
         }
 
-        // Fetch matching user
+        //Fetch pasującego uż
         let request: NSFetchRequest<User> = User.fetchRequest()
         request.predicate = NSPredicate(format: "email ==[c] %@ AND password == %@", email, password)
         request.fetchLimit = 1
@@ -164,7 +158,6 @@ final class AuthViewModel: ObservableObject {
         do {
             let results = try viewContext.fetch(request)
             if let user = results.first {
-                // Clear all isCurrent first
                 let allUsers = try viewContext.fetch(User.fetchRequest())
                 for u in allUsers {
                     u.isCurrent = false
@@ -183,9 +176,9 @@ final class AuthViewModel: ObservableObject {
     }
     
     // MARK: - Logout
-    /// Logs out the current user.
+    //Wylogowanie obecnego uż
     func logout() {
-        // Fetch all users and reset isCurrent
+        //Fetch wszystkich użytkowników i reset isCurrent
         let fetchRequest: NSFetchRequest<User> = User.fetchRequest()
         do {
             let users = try viewContext.fetch(fetchRequest)
@@ -197,7 +190,6 @@ final class AuthViewModel: ObservableObject {
             print("Failed to reset isCurrent flags: \(error.localizedDescription)")
         }
 
-        // Reset state
         isAuthenticated = false
         currentUser = nil
         email = ""
@@ -205,7 +197,7 @@ final class AuthViewModel: ObservableObject {
         name = ""
         preferences = ""
     }
-    /// Clears old session by resetting `isCurrent` for all users
+    //Czyszczenie starych sesji przez reset `isCurrent` dla wszystkich uż
     func clearOldSessions() {
         let fetchRequest: NSFetchRequest<User> = User.fetchRequest()
         do {

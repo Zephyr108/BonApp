@@ -1,10 +1,9 @@
 import SwiftUI
 import UIKit
 
-// MARK: - View Helpers
+// MARK: - Helpery Widoków
 
-extension View {
-    /// Dismisses the keyboard from any text input.
+extension View { //ukrywanie klawiatury
     func hideKeyboard() {
         UIApplication.shared.sendAction(
             #selector(UIResponder.resignFirstResponder),
@@ -13,45 +12,45 @@ extension View {
     }
 }
 
-// MARK: - String Helpers
+// MARK: - Helpery Stringów
 
 extension String {
-    /// Returns the string trimmed of whitespace and newlines.
+    //usuwanie pustych znaków
     var trimmed: String {
         trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
-    /// Checks if the string contains any non-whitespace characters.
+    //sprawdzenie czy ciąg nie jest pusty
     var isNotEmpty: Bool {
         !trimmed.isEmpty
     }
     
-    /// Splits a comma-separated string into an array of trimmed substrings.
+    //dzielenie ciągów po , na tabele
     func splitCommaSeparated() -> [String] {
         split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
     }
 }
 
-// MARK: - Collection Helpers
+// MARK: - Helpery Kolekcji
 
 extension Collection {
-    /// Safely returns the element at the given index if it exists.
+    // zwracanie elementu o danym indeksie jak istnieje
     subscript(safe index: Index) -> Element? {
         indices.contains(index) ? self[index] : nil
     }
 }
 
-// MARK: - UIImage and Data Helpers
+// MARK: - Helpery UUImage
 
 extension Data {
-    /// Attempts to create a UIImage from this data.
+    //UUImage
     var asUIImage: UIImage? {
         UIImage(data: self)
     }
 }
 
-// MARK: - Color Hex Conversion
+// MARK: - Zamiana koloru HEX
 
 extension Color {
     init?(hex: String) {

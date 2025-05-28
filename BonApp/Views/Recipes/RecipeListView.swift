@@ -12,7 +12,6 @@ struct RecipeListView: View {
     @State private var selectedRecipe: Recipe?
     @State private var isNavigating = false
 
-    /// Only show recipes that are public, or that belong to the current user.
     private var filteredRecipes: [Recipe] {
         recipes.filter { recipe in
             if let user = auth.currentUser {
@@ -22,13 +21,13 @@ struct RecipeListView: View {
         }
     }
 
-    /// Recipes authored by the current user.
+    //Przepisy obecnie zalogowanego
     private var myRecipes: [Recipe] {
         guard let user = auth.currentUser else { return [] }
         return recipes.filter { $0.author == user }
     }
-
-    /// Public recipes authored by other users.
+    
+    //Przepisy innych
     private var otherRecipes: [Recipe] {
         return recipes.filter { recipe in
             recipe.isPublic && recipe.author != auth.currentUser

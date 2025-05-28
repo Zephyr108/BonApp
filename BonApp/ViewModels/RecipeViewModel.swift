@@ -1,22 +1,18 @@
 import Foundation
 import CoreData
 
-/// ViewModel responsible for fetching and managing recipes.
 final class RecipeViewModel: ObservableObject {
-    // MARK: - Published properties
     @Published var recipes: [Recipe] = []
 
-    // MARK: - Core Data context
     private let viewContext: NSManagedObjectContext
 
-    // MARK: - Initialization
+    // MARK: - Inicjalizacja
     init(context: NSManagedObjectContext = PersistenceController.shared.container.viewContext) {
         self.viewContext = context
         fetchRecipes()
     }
 
     // MARK: - Fetch
-    /// Fetches all recipes sorted by title.
     func fetchRecipes() {
         let request: NSFetchRequest<Recipe> = Recipe.fetchRequest()
         request.sortDescriptors = [
@@ -32,7 +28,6 @@ final class RecipeViewModel: ObservableObject {
     }
 
     // MARK: - Add
-    /// Adds a new recipe.
     func addRecipe(
         title: String,
         detail: String,
@@ -58,7 +53,6 @@ final class RecipeViewModel: ObservableObject {
     }
 
     // MARK: - Update
-    /// Updates an existing recipe.
     func updateRecipe(
         _ recipe: Recipe,
         title: String,
@@ -82,15 +76,13 @@ final class RecipeViewModel: ObservableObject {
     }
 
     // MARK: - Delete
-    /// Deletes a recipe.
     func deleteRecipe(_ recipe: Recipe) {
         viewContext.delete(recipe)
         saveContext()
         fetchRecipes()
     }
 
-    // MARK: - Helpers
-    /// Saves the current context.
+    // MARK: - Helpery
     private func saveContext() {
         do {
             try viewContext.save()
@@ -99,20 +91,20 @@ final class RecipeViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Steps
+    // MARK: - Kroki
 
-    /// Adds a new step to the given recipe. Step order is computed as existing step count + 1.
+    //Dodaje krok, kolejność +1
     func addStep(_ instruction: String, to recipe: Recipe) {
         let step = RecipeStep(context: viewContext)
         step.instruction = instruction
-        // Compute order based on existing steps count
+        //Ustawia kolejność na podstawie ilości kroków
         let existingCount = (recipe.steps as? Set<RecipeStep>)?.count ?? 0
         step.order = Int16(existingCount + 1)
         step.recipe = recipe
         saveContext()
     }
 
-    /// Returns the steps for a recipe, sorted by their order property.
+    //Zwraca kroki po kolejności
     func steps(for recipe: Recipe) -> [RecipeStep] {
         let set = (recipe.steps as? Set<RecipeStep>) ?? []
         return set.sorted { $0.order < $1.order }

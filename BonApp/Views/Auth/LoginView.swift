@@ -65,7 +65,7 @@ struct LoginView: View {
 struct LoginView_Previews: PreviewProvider {
     static var previews: some View {
         LoginView()
-            .environmentObject(AuthViewModel()) // <- to jest kluczowe
+            .environmentObject(AuthViewModel())
             .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
     }
 }

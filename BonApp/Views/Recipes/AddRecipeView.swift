@@ -195,7 +195,6 @@ struct AddRecipeView: View {
         }
         newRecipe.author = user
 
-        // Save recipe steps
         for (index, instruction) in stepTexts.enumerated() {
             let step = RecipeStep(context: viewContext)
             step.instruction = instruction

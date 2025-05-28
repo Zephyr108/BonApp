@@ -1,22 +1,19 @@
 import Foundation
 import CoreData
 
-/// ViewModel responsible for managing shopping list items.
 final class ShoppingListViewModel: ObservableObject {
-    // MARK: - Published properties
     @Published var items: [ShoppingListItem] = []
 
-    // MARK: - Core Data context
     private let viewContext: NSManagedObjectContext
 
-    // MARK: - Initialization
+    // MARK: - Inicjalizacja
     init(context: NSManagedObjectContext = PersistenceController.shared.container.viewContext) {
         self.viewContext = context
         fetchItems()
     }
 
     // MARK: - Fetch
-    /// Fetches all shopping list items, sorted by purchased status then name.
+    //Pobiera wszystkie rzeczy z sl, sortuje po tym kiedy były kupione potem po nazwie
     func fetchItems() {
         let request: NSFetchRequest<ShoppingListItem> = ShoppingListItem.fetchRequest()
         request.sortDescriptors = [
@@ -33,7 +30,6 @@ final class ShoppingListViewModel: ObservableObject {
     }
 
     // MARK: - Add
-    /// Adds a new item to the shopping list.
     func addItem(name: String, quantity: String, category: String, owner: User) {
         let newItem = ShoppingListItem(context: viewContext)
         newItem.name = name
@@ -47,7 +43,6 @@ final class ShoppingListViewModel: ObservableObject {
     }
 
     // MARK: - Update
-    /// Updates an existing shopping list item.
     func updateItem(_ item: ShoppingListItem, name: String, quantity: String) {
         item.name = name
         item.quantity = quantity
@@ -57,7 +52,6 @@ final class ShoppingListViewModel: ObservableObject {
     }
 
     // MARK: - Delete
-    /// Deletes a shopping list item.
     func deleteItem(_ item: ShoppingListItem) {
         viewContext.delete(item)
 
@@ -65,21 +59,19 @@ final class ShoppingListViewModel: ObservableObject {
         fetchItems()
     }
 
-    // MARK: - Mark as Bought
-    /// Marks an item as bought.
+    // MARK: - Oznacz jako kupione
     func markAsBought(_ item: ShoppingListItem) {
         item.isBought = true
         saveContext()
         fetchItems()
     }
 
-    // MARK: - Helpers
-    /// Saves the current context.
+    // MARK: - Helpery
     func saveContext() {
         if viewContext.hasChanges {
             do {
                 try viewContext.save()
-                // Force refresh of published items to reflect UI updates
+                // Wymuszenie odświeżenia
                 fetchItems()
                 objectWillChange.send()
             } catch {
@@ -88,8 +80,7 @@ final class ShoppingListViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Add Bought Items to Pantry
-    /// Transfers bought items to pantry and removes them from shopping list.
+    // MARK: - Dodaj kupione do spiżarni
     func transferBoughtItemsToPantry(for user: User) {
         let boughtItems = items.filter { $0.isBought && $0.owner == user }
 

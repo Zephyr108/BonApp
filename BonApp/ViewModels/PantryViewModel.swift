@@ -1,16 +1,13 @@
 import Foundation
 import CoreData
 
-/// ViewModel responsible for managing pantry items.
 final class PantryViewModel: ObservableObject {
-    // MARK: - Published properties
     @Published var pantryItems: [PantryItem] = []
 
-    // MARK: - Core Data context
     private let viewContext: NSManagedObjectContext
     private let user: User
 
-    // MARK: - Initialization
+    // MARK: - Inicjalizacja
     init(user: User, context: NSManagedObjectContext = PersistenceController.shared.container.viewContext) {
         self.user = user
         self.viewContext = context
@@ -18,7 +15,6 @@ final class PantryViewModel: ObservableObject {
     }
 
     // MARK: - Fetch
-    /// Fetches all pantry items, sorted by category then name.
     func fetchPantryItems() {
         let request: NSFetchRequest<PantryItem> = PantryItem.fetchRequest()
         request.predicate = NSPredicate(format: "owner == %@", user)
@@ -36,7 +32,6 @@ final class PantryViewModel: ObservableObject {
     }
 
     // MARK: - Add
-    /// Adds a new item to the pantry.
     func addItem(name: String, quantity: String, category: String, owner: User) {
         let newItem = PantryItem(context: viewContext)
         newItem.name = name
@@ -49,7 +44,6 @@ final class PantryViewModel: ObservableObject {
     }
 
     // MARK: - Update
-    /// Updates an existing pantry item.
     func updateItem(_ item: PantryItem, name: String, quantity: String, category: String) {
         item.name = name
         item.quantity = quantity
@@ -60,7 +54,6 @@ final class PantryViewModel: ObservableObject {
     }
 
     // MARK: - Delete
-    /// Deletes a pantry item.
     func deleteItem(_ item: PantryItem) {
         viewContext.delete(item)
 
@@ -68,13 +61,12 @@ final class PantryViewModel: ObservableObject {
         fetchPantryItems()
     }
 
-    /// Call this to refresh the pantry items from the store.
+    //Refresh
     func refresh() {
         fetchPantryItems()
     }
 
-    // MARK: - Helpers
-    /// Saves the current context.
+    // MARK: - Helpery
     private func saveContext() {
         do {
             try viewContext.save()

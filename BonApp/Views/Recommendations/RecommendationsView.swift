@@ -67,7 +67,6 @@ struct RecommendationsView: View {
 struct RecommendationsView_Previews: PreviewProvider {
     static var previews: some View {
         let context = PersistenceController.shared.container.viewContext
-        // Create a sample user with pantry items for preview
         let user = User(context: context)
         user.name = "Jan"
         let samplePantry = PantryItem(context: context)

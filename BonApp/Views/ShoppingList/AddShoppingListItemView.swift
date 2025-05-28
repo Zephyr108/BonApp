@@ -6,7 +6,6 @@ struct AddShoppingListItemView: View {
     @State private var category: String = ""
     @Environment(\.dismiss) private var dismiss
 
-    /// Callback when the user taps the Add button.
     let onSave: (_ name: String, _ quantity: String, _ category: String) -> Void
 
     var body: some View {
@@ -90,7 +89,6 @@ struct AddShoppingListItemView: View {
 struct AddShoppingListItemView_Previews: PreviewProvider {
     static var previews: some View {
         AddShoppingListItemView { name, quantity, category in
-            // preview handler
         }
     }
 }

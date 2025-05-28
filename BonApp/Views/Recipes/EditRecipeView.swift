@@ -28,7 +28,6 @@ struct EditRecipeView: View {
         _ingredientsText = State(initialValue: currentIngredients.joined(separator: ", "))
         _cookTime = State(initialValue: String(recipe.cookTime))
         _isPublic = State(initialValue: recipe.isPublic)
-        // Initialize step texts from existing RecipeStep objects
         let steps = (recipe.steps as? Set<RecipeStep>)?
             .sorted { $0.order < $1.order } ?? []
         _stepTexts = State(initialValue: steps.map { $0.instruction ?? "" })
@@ -237,18 +236,16 @@ struct EditRecipeView: View {
             recipe.cookTime = ct
         }
         recipe.isPublic = isPublic
-        // Update image
+        // Update zdj
         if let uiImage = selectedImage,
            let data = uiImage.jpegData(compressionQuality: 0.8) {
             recipe.images = data
         } else {
             recipe.images = nil
         }
-        // Remove existing steps
         if let existing = recipe.steps as? Set<RecipeStep> {
             existing.forEach(viewContext.delete)
         }
-        // Add updated steps
         for (index, instruction) in stepTexts.enumerated() {
             let step = RecipeStep(context: viewContext)
             step.instruction = instruction

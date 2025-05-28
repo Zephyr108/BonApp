@@ -80,7 +80,6 @@ struct RecipeRowView_Previews: PreviewProvider {
         let sample = Recipe(context: context)
         sample.title = "Przykładowy przepis"
         sample.cookTime = 20
-        // sample.images left nil for placeholder
         return RecipeRowView(recipe: sample)
             .previewLayout(.sizeThatFits)
             .padding()

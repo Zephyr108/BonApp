@@ -12,7 +12,6 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section(header: Text("Ustawienia").foregroundColor(Color("textSecondary"))) {
-                // Twoje opcje, np. zmiana hasła, powiadomienia, itp.
                 Text("Wersja aplikacji: 1.0")
                     .foregroundColor(Color("textPrimary"))
             }
@@ -31,3 +30,5 @@ struct SettingsView_Previews: PreviewProvider {
             .environment(\.managedObjectContext, ctx)
     }
 }
+
+//To do

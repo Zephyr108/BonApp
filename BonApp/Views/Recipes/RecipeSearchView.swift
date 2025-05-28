@@ -5,7 +5,6 @@ struct RecipeSearchView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @EnvironmentObject var auth: AuthViewModel
     
-    // Fetch all recipes sorted by title
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Recipe.title, ascending: true)],
         animation: .default)
@@ -15,7 +14,6 @@ struct RecipeSearchView: View {
     @State private var maxCookTime: Double = 60
     @State private var showOnlyFavorites: Bool = false
     
-    // Filtered recipes based on search text and cook time
     private var filteredRecipes: [Recipe] {
         recipes.filter { recipe in
             let matchesName = searchText.isEmpty ||
@@ -30,7 +28,6 @@ struct RecipeSearchView: View {
     var body: some View {
         NavigationStack {
             VStack {
-                // Cook time filter
                 HStack {
                     Text("Max czas: \(Int(maxCookTime)) min")
                         .foregroundColor(Color("textPrimary"))
@@ -71,7 +68,6 @@ struct RecipeSearchView: View {
 struct RecipeSearchView_Previews: PreviewProvider {
     static var previews: some View {
         let context = PersistenceController.shared.container.viewContext
-        // Create sample recipes for preview
         let sample1 = Recipe(context: context)
         sample1.title = "Makaron z sosem"
         sample1.cookTime = 30

@@ -8,9 +8,7 @@
 import SwiftUI
 
 struct CategoryFilterView: View {
-    /// List of available categories (e.g., ["Wszystkie", "Nabiał", "Mięso", "Warzywa"])
     let categories: [String]
-    /// Currently selected category; `nil` means no filtering or "Wszystkie"
     @Binding var selectedCategory: String?
 
     var body: some View {
@@ -51,3 +49,5 @@ struct CategoryFilterView_Previews: PreviewProvider {
         )
     }
 }
+
+//To do

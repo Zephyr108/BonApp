@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct IngredientsListView: View {
-    /// Array of ingredient strings to display
     let ingredients: [String]
 
     var body: some View {

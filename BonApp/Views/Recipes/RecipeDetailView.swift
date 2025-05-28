@@ -17,7 +17,6 @@ struct RecipeDetailView: View {
         (recipe.ingredients as? [String]) ?? []
     }
 
-    /// Steps of the recipe, sorted by order.
     private var stepsArray: [RecipeStep] {
         let set = (recipe.steps as? Set<RecipeStep>) ?? []
         return set.sorted { $0.order < $1.order }
@@ -28,7 +27,6 @@ struct RecipeDetailView: View {
             Color("background").ignoresSafeArea()
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    // Display recipe image if available
                     if let imageData = recipe.images, let uiImage = UIImage(data: imageData) {
                         Image(uiImage: uiImage)
                             .resizable()
@@ -36,7 +34,6 @@ struct RecipeDetailView: View {
                             .cornerRadius(8)
                     }
                     
-                    // Title and cook time
                     Text(recipe.title ?? "Brak tytułu")
                         .font(.title)
                         .bold()
@@ -45,7 +42,6 @@ struct RecipeDetailView: View {
                         .font(.subheadline)
                         .foregroundColor(Color("textSecondary"))
                     
-                    // Description
                     if let detail = recipe.detail {
                         Text(detail)
                             .font(.body)
@@ -54,7 +50,6 @@ struct RecipeDetailView: View {
                     
                     Divider()
                     
-                    // Ingredients list
                     Text("Składniki")
                         .font(.headline)
                         .foregroundColor(Color("textSecondary"))
@@ -65,7 +60,6 @@ struct RecipeDetailView: View {
 
                     Divider()
 
-                    // Steps list
                     Text("Kroki")
                         .font(.headline)
                         .foregroundColor(Color("textSecondary"))
@@ -94,7 +88,6 @@ struct RecipeDetailView: View {
 struct RecipeDetailView_Previews: PreviewProvider {
     static var previews: some View {
         let context = PersistenceController.shared.container.viewContext
-        // Mock recipe for preview
         let sample = Recipe(context: context)
         sample.title = "Przykładowy przepis"
         sample.cookTime = 25

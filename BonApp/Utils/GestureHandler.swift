@@ -1,14 +1,14 @@
 import SwiftUI
 
-/// kierunki
+//kierunki
 enum SwipeDirection {
     case left, right, up, down
 }
 
-/// cała struktura do gestów
+//cała struktura do gestów
 struct GestureHandler {
     
-    /// drag
+    //drag
     static func dragGesture(
         onChanged: @escaping (CGSize) -> Void,
         onEnded: @escaping (CGSize) -> Void
@@ -22,7 +22,7 @@ struct GestureHandler {
             }
     }
 
-    /// swipe
+    //swipe
     static func swipeGesture(
         _ direction: SwipeDirection,
         threshold: CGFloat = 50,
@@ -45,7 +45,7 @@ struct GestureHandler {
             }
     }
 
-    /// long-press
+    //long-press
     static func longPressGesture(
         minimumDuration: Double = 0.5,
         perform: @escaping () -> Void
@@ -54,7 +54,7 @@ struct GestureHandler {
             .onEnded { _ in perform() }
     }
     
-    /// double-tap
+    //double-tap
     static func doubleTapGesture(
         user: User?,
         perform: @escaping () -> Void
