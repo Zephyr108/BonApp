@@ -6,17 +6,15 @@
 //
 
 import SwiftUI
-import CoreData
 
 @main
 struct BonAppApp: App {
-    let persistence = PersistenceController.shared
+    @StateObject private var auth = AuthViewModel()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environment(\.managedObjectContext, persistence.container.viewContext)
+                .environmentObject(auth)
         }
     }
 }
-

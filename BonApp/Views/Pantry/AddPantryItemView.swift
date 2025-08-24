@@ -1,12 +1,11 @@
 import SwiftUI
+import Supabase
 
 struct AddPantryItemView: View {
     @State private var name: String = ""
     @State private var quantity: String = ""
     @State private var category: String = ""
     @Environment(\.dismiss) private var dismiss
-
-    let onSave: (_ name: String, _ quantity: String, _ category: String) -> Void
 
     var body: some View {
         NavigationStack {
@@ -68,9 +67,7 @@ struct AddPantryItemView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Dodaj") {
-                        onSave(name.trimmingCharacters(in: .whitespacesAndNewlines),
-                               quantity.trimmingCharacters(in: .whitespacesAndNewlines),
-                               category.trimmingCharacters(in: .whitespacesAndNewlines))
+                        savePantryItem()
                         dismiss()
                     }
                     .disabled(
@@ -82,11 +79,24 @@ struct AddPantryItemView: View {
             }
         }
     }
+    
+    private func savePantryItem() {
+        let client = SupabaseManager.shared.client
+        Task {
+            do {
+                let _ = try await client.database
+                    .from("pantry")
+                    .insert(["name": name, "quantity": quantity, "category": category])
+                    .execute()
+            } catch {
+                print("Failed to save pantry item: \(error.localizedDescription)")
+            }
+        }
+    }
 }
 
 struct AddPantryItemView_Previews: PreviewProvider {
     static var previews: some View {
-        AddPantryItemView { name, quantity, category in
-        }
+        AddPantryItemView()
     }
 }

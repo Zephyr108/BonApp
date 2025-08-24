@@ -1,11 +1,27 @@
 import UIKit
 import SwiftUI
 import Foundation
-import CoreData
+import Supabase
+
+private struct RecipeUpdatePayload: Encodable {
+    let title: String
+    let detail: String
+    let is_public: Bool
+    let cook_time: Int
+    let ingredients: [String]
+    let image_url: String?
+}
+
+private struct RecipeStepInsert: Encodable {
+    let id: UUID
+    let recipe_id: UUID
+    let order: Int
+    let instruction: String
+}
 
 struct EditRecipeView: View {
-    @ObservedObject var recipe: Recipe
-    @Environment(\.managedObjectContext) private var viewContext
+    let recipeId: UUID
+    @EnvironmentObject var auth: AuthViewModel
     @Environment(\.dismiss) private var dismiss
 
     @State private var title: String
@@ -17,25 +33,31 @@ struct EditRecipeView: View {
     @State private var stepTexts: [String]
     @State private var newStepText: String = ""
 
-    @State private var selectedImage: UIImage?
+    // Image handling
+    @State private var selectedImage: UIImage? = nil
+    @State private var currentImageURL: String? = nil
     @State private var isShowingImagePicker = false
+    @State private var imageRemoved = false
 
-    init(recipe: Recipe) {
-        self.recipe = recipe
-        _title = State(initialValue: recipe.title ?? "")
-        _detail = State(initialValue: recipe.detail ?? "")
-        let currentIngredients = (recipe.ingredients as? [String]) ?? []
-        _ingredientsText = State(initialValue: currentIngredients.joined(separator: ", "))
-        _cookTime = State(initialValue: String(recipe.cookTime))
-        _isPublic = State(initialValue: recipe.isPublic)
-        let steps = (recipe.steps as? Set<RecipeStep>)?
-            .sorted { $0.order < $1.order } ?? []
-        _stepTexts = State(initialValue: steps.map { $0.instruction ?? "" })
-        if let data = recipe.images, let uiImage = UIImage(data: data) {
-            _selectedImage = State(initialValue: uiImage)
-        } else {
-            _selectedImage = State(initialValue: nil)
-        }
+    @State private var isSaving = false
+    @State private var errorMessage: String? = nil
+
+    init(recipeId: UUID,
+         title: String = "",
+         detail: String = "",
+         ingredients: [String] = [],
+         cookTime: Int = 0,
+         isPublic: Bool = false,
+         steps: [String] = [],
+         imageURL: String? = nil) {
+        self.recipeId = recipeId
+        _title = State(initialValue: title)
+        _detail = State(initialValue: detail)
+        _ingredientsText = State(initialValue: ingredients.joined(separator: ", "))
+        _cookTime = State(initialValue: String(cookTime))
+        _isPublic = State(initialValue: isPublic)
+        _stepTexts = State(initialValue: steps)
+        _currentImageURL = State(initialValue: imageURL)
     }
 
     var body: some View {
@@ -50,7 +72,6 @@ struct EditRecipeView: View {
                     TextField("Tytuł", text: $title)
                         .foregroundColor(Color("textPrimary"))
                         .padding(16)
-                        //.frame(height: 44)
                         .background(Color("textfieldBackground"))
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
                         .cornerRadius(8)
@@ -58,7 +79,6 @@ struct EditRecipeView: View {
                     TextField("Opis", text: $detail)
                         .foregroundColor(Color("textPrimary"))
                         .padding(16)
-                        //.frame(height: 44)
                         .background(Color("textfieldBackground"))
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
                         .cornerRadius(8)
@@ -89,27 +109,53 @@ struct EditRecipeView: View {
                             .cornerRadius(8)
 
                         HStack {
-                            Button("Zmień zdjęcie") {
-                                isShowingImagePicker = true
-                            }
-                            .padding()
-                            .frame(height: 44)
-                            .background(Color("textfieldBackground"))
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
-                            .cornerRadius(8)
+                            Button("Zmień zdjęcie") { isShowingImagePicker = true }
+                                .padding()
+                                .frame(height: 44)
+                                .background(Color("textfieldBackground"))
+                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
+                                .cornerRadius(8)
 
                             Spacer()
 
                             Button(role: .destructive) {
                                 selectedImage = nil
-                            } label: {
-                                Text("Usuń zdjęcie")
+                                imageRemoved = true
+                            } label: { Text("Usuń zdjęcie") }
+                                .padding()
+                                .frame(height: 44)
+                                .background(Color("textfieldBackground"))
+                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
+                                .cornerRadius(8)
+                        }
+                    } else if let urlString = currentImageURL, let url = URL(string: urlString) {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .empty: ProgressView()
+                            case .success(let image): image.resizable().scaledToFit().cornerRadius(8)
+                            case .failure: placeholderImage
+                            @unknown default: placeholderImage
                             }
-                            .padding()
-                            .frame(height: 44)
-                            .background(Color("textfieldBackground"))
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
-                            .cornerRadius(8)
+                        }
+                        HStack {
+                            Button("Zmień zdjęcie") { isShowingImagePicker = true }
+                                .padding()
+                                .frame(height: 44)
+                                .background(Color("textfieldBackground"))
+                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
+                                .cornerRadius(8)
+
+                            Spacer()
+
+                            Button(role: .destructive) {
+                                currentImageURL = nil
+                                imageRemoved = true
+                            } label: { Text("Usuń zdjęcie") }
+                                .padding()
+                                .frame(height: 44)
+                                .background(Color("textfieldBackground"))
+                                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
+                                .cornerRadius(8)
                         }
                     } else {
                         Button(action: { isShowingImagePicker = true }) {
@@ -119,7 +165,6 @@ struct EditRecipeView: View {
                             }
                         }
                         .padding()
-                        //.frame(height: 44)
                         .foregroundColor(.blue)
                         .background(Color("textfieldBackground"))
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
@@ -136,7 +181,6 @@ struct EditRecipeView: View {
                     TextField("Składniki", text: $ingredientsText)
                         .foregroundColor(Color("textPrimary"))
                         .padding(16)
-                        //.frame(height: 44)
                         .background(Color("textfieldBackground"))
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
                         .cornerRadius(8)
@@ -152,7 +196,6 @@ struct EditRecipeView: View {
                         .keyboardType(.numberPad)
                         .foregroundColor(Color("textPrimary"))
                         .padding(16)
-                        //.frame(height: 44)
                         .background(Color("textfieldBackground"))
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
                         .cornerRadius(8)
@@ -200,7 +243,6 @@ struct EditRecipeView: View {
                             newStepText = ""
                         }
                         .disabled(newStepText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        //.foregroundColor(Color("textPrimary"))
                         .padding()
                         .background(Color("addStep"))
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
@@ -208,71 +250,123 @@ struct EditRecipeView: View {
                     }
                 }
 
-                Button("Zapisz zmiany") {
-                    saveChanges()
+                if let errorMessage { Text(errorMessage).foregroundColor(.red) }
+
+                Button(isSaving ? "Zapisywanie…" : "Zapisz zmiany") {
+                    Task { await saveChanges() }
                 }
+                .disabled(!canSave || isSaving)
                 .frame(maxWidth: .infinity, minHeight: 44)
-                .background(Color("edit"))
+                .background(canSave && !isSaving ? Color("edit") : Color("textfieldBorder"))
                 .foregroundColor(Color("buttonText"))
                 .cornerRadius(8)
             }
             .padding()
         }
         .background(Color("background").ignoresSafeArea())
-        .sheet(isPresented: $isShowingImagePicker) {
-            ImagePicker(image: $selectedImage)
-        }
+        .sheet(isPresented: $isShowingImagePicker) { ImagePicker(image: $selectedImage) }
         .navigationTitle("Edytuj przepis")
     }
 
-    private func saveChanges() {
-        recipe.title = title
-        recipe.detail = detail
-        let items = ingredientsText
+    private var canSave: Bool {
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        Int(cookTime.trimmingCharacters(in: .whitespacesAndNewlines)) != nil
+    }
+
+    private var placeholderImage: some View {
+        Rectangle().fill(Color.secondary.opacity(0.3)).frame(height: 180).cornerRadius(8)
+    }
+
+    private func saveChanges() async {
+        guard let _ = auth.currentUser?.id else {
+            await MainActor.run { errorMessage = "Brak zalogowanego użytkownika." }
+            return
+        }
+        isSaving = true
+        errorMessage = nil
+        defer { isSaving = false }
+
+        let client = SupabaseManager.shared.client
+        let cookTimeInt = Int(cookTime.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+        let ingredientsArray = ingredientsText
             .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-        recipe.ingredients = items as NSArray
-        if let ct = Int16(cookTime) {
-            recipe.cookTime = ct
-        }
-        recipe.isPublic = isPublic
-        // Update zdj
-        if let uiImage = selectedImage,
-           let data = uiImage.jpegData(compressionQuality: 0.8) {
-            recipe.images = data
-        } else {
-            recipe.images = nil
-        }
-        if let existing = recipe.steps as? Set<RecipeStep> {
-            existing.forEach(viewContext.delete)
-        }
-        for (index, instruction) in stepTexts.enumerated() {
-            let step = RecipeStep(context: viewContext)
-            step.instruction = instruction
-            step.order = Int16(index + 1)
-            step.recipe = recipe
-        }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
         do {
-            try viewContext.save()
-            dismiss()
+            // Handle image: upload new or remove
+            var newImageURL: String? = currentImageURL
+            if let img = selectedImage, let data = img.jpegData(compressionQuality: 0.85) {
+                let path = "\(recipeId)/image.jpg"
+                _ = try await client.storage
+                    .from("recipes")
+                    .upload(path: path, file: data, options: FileOptions(cacheControl: "3600", contentType: "image/jpeg", upsert: true))
+                newImageURL = try client.storage.from("recipes").getPublicURL(path: path).absoluteString
+                imageRemoved = false
+            } else if imageRemoved {
+                newImageURL = nil
+            }
+
+            // 1) Update main recipe row
+            let updatePayload = RecipeUpdatePayload(
+                title: title,
+                detail: detail,
+                is_public: isPublic,
+                cook_time: cookTimeInt,
+                ingredients: ingredientsArray,
+                image_url: newImageURL
+            )
+
+            _ = try await client.database
+                .from("recipes")
+                .update(updatePayload)
+                .eq("id", value: recipeId)
+                .execute()
+
+            // 2) Replace steps: delete existing, insert new
+            _ = try await client.database
+                .from("recipe_steps")
+                .delete()
+                .eq("recipe_id", value: recipeId)
+                .execute()
+
+            if !stepTexts.isEmpty {
+                let stepsPayload: [RecipeStepInsert] = stepTexts.enumerated().map { (index, text) in
+                    RecipeStepInsert(
+                        id: UUID(),
+                        recipe_id: recipeId,
+                        order: index + 1,
+                        instruction: text
+                    )
+                }
+                _ = try await client.database
+                    .from("recipe_steps")
+                    .insert(stepsPayload)
+                    .execute()
+            }
+
+            await MainActor.run { dismiss() }
         } catch {
-            print("Błąd zapisu przepisu: \(error.localizedDescription)")
+            await MainActor.run { errorMessage = error.localizedDescription }
         }
     }
 }
 
 struct EditRecipeView_Previews: PreviewProvider {
     static var previews: some View {
-        let context = PersistenceController.shared.container.viewContext
-        let sample = Recipe(context: context)
-        sample.title = "Przykład"
-        sample.detail = "Opis przepisu"
-        sample.ingredients = ["Składnik1", "Składnik2"]
-        sample.cookTime = 15
-        sample.isPublic = true
+        let sampleId = UUID()
         return NavigationStack {
-            EditRecipeView(recipe: sample)
-                .environment(\.managedObjectContext, context)
+            EditRecipeView(
+                recipeId: sampleId,
+                title: "Przykład",
+                detail: "Opis przepisu",
+                ingredients: ["Składnik1", "Składnik2"],
+                cookTime: 15,
+                isPublic: true,
+                steps: ["Krok 1", "Krok 2"],
+                imageURL: nil
+            )
+            .environmentObject(AuthViewModel())
         }
     }
 }

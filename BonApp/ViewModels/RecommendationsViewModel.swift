@@ -1,58 +1,69 @@
 import Foundation
-import CoreData
+import Supabase
 
+// ViewModel for recipe recommendations (Supabase)
 final class RecommendationsViewModel: ObservableObject {
-    @Published var recommendations: [Recipe] = []
+    // Filters
     @Published var filterVegetarian: Bool = false
     @Published var filterQuick: Bool = false
     @Published var filterBudget: Bool = false
     @Published var maxMissingIngredients: Int = 3
 
-    private let viewContext: NSManagedObjectContext
+    // State
+    @Published var recommendations: [RecipeItem] = []
+    @Published var isLoading: Bool = false
+    @Published var error: String? = nil
 
-    // MARK: - Inicjalizacja
-    init(context: NSManagedObjectContext = PersistenceController.shared.container.viewContext) {
-        self.viewContext = context
+    private let client = SupabaseManager.shared.client
+
+    private struct RecommendationsParams: Encodable {
+        let p_user_id: String
+        let p_max_missing: Int
+        let p_quick: Bool
+        let p_vegetarian: Bool
+        let p_budget: Bool
     }
 
-    // Pobiera rekomendacje na podstawie produktów w spiżarni
-    func fetchRecommendations(for user: User) {
-        let pantryItemsSet = (user.pantryItems as? Set<PantryItem>) ?? []
-        let pantrySet: Set<String> = Set(pantryItemsSet.compactMap { $0.name })
-
-        //Pobiera publiczne i prywatne (obecnego) przepisy
-        let request: NSFetchRequest<Recipe> = Recipe.fetchRequest()
-        request.predicate = NSCompoundPredicate(orPredicateWithSubpredicates: [
-            NSPredicate(format: "isPublic == YES"),
-            NSPredicate(format: "author == %@", user)
-        ])
+    // MARK: - Fetch recommendations using RPC
+    @MainActor
+    func fetchRecommendations(for userId: String?) async {
+        guard !isLoading else { return }
+        guard let userId else {
+            self.error = "Brak zalogowanego użytkownika."
+            self.recommendations = []
+            return
+        }
+        isLoading = true
+        error = nil
+        defer { isLoading = false }
 
         do {
-            let allRecipes = try viewContext.fetch(request)
-            let filtered = allRecipes.filter { recipe in
-                let ingredientsArray = (recipe.ingredients as? [String]) ?? []
-                let missing = ingredientsArray.filter { !pantrySet.contains($0) }
-                guard missing.count <= maxMissingIngredients else { return false }
+            let params = RecommendationsParams(
+                p_user_id: userId,
+                p_max_missing: maxMissingIngredients,
+                p_quick: filterQuick,
+                p_vegetarian: filterVegetarian,
+                p_budget: filterBudget
+            )
 
-                if filterQuick && recipe.cookTime > 30 { return false }
+            struct Row: Decodable { let id: UUID; let title: String; let cook_time: Int; let image_url: String?; let is_favorite: Bool? }
+            let rows: [Row] = try await client.database
+                .rpc("get_recommendations", params: params)
+                .execute()
+                .value
 
-                if filterVegetarian && !(recipe.detail?.localizedCaseInsensitiveContains("wegetari") ?? false) {
-                    return false
-                }
-
-                if filterBudget && !(recipe.detail?.localizedCaseInsensitiveContains("budżet") ?? false) {
-                    return false
-                }
-
-                return true
+            self.recommendations = rows.map { row in
+                RecipeItem(
+                    id: row.id,
+                    title: row.title,
+                    cookTime: row.cook_time,
+                    imageURL: row.image_url,
+                    isFavorite: row.is_favorite ?? false
+                )
             }
-            //Udostępnia rekomendacje
-            recommendations = filtered
         } catch {
-            print("Failed to fetch recommendations: \(error.localizedDescription)")
-            recommendations = []
+            self.error = error.localizedDescription
+            self.recommendations = []
         }
     }
 }
-
-//To do

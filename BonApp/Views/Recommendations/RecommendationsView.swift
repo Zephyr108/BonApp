@@ -1,9 +1,9 @@
 import SwiftUI
 
 struct RecommendationsView: View {
-    @ObservedObject var user: User
+    @EnvironmentObject var auth: AuthViewModel
     @StateObject private var viewModel = RecommendationsViewModel()
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -23,18 +23,37 @@ struct RecommendationsView: View {
                         Text("Filtry")
                             .foregroundColor(Color("textSecondary"))
                     }
-                    
+
                     Section {
-                        if viewModel.recommendations.isEmpty {
+                        if viewModel.isLoading {
+                            HStack { Spacer(); ProgressView(); Spacer() }
+                                .listRowBackground(Color.clear)
+                        } else if let error = viewModel.error {
+                            Text("Błąd: \(error)")
+                                .foregroundColor(.secondary)
+                                .padding(8)
+                                .background(Color("itemsListBackground"))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                        } else if viewModel.recommendations.isEmpty {
                             Text("Brak rekomendacji dla obecnych filtrów i zawartości spiżarni.")
                                 .foregroundColor(Color("textSecondary"))
                                 .padding(8)
                                 .background(Color("itemsListBackground"))
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
                         } else {
-                            List(viewModel.recommendations, id: \.self) { recipe in
-                                NavigationLink(destination: RecipeDetailView(recipe: recipe)) {
-                                    RecipeRowView(recipe: recipe)
+                            List(viewModel.recommendations, id: \.id) { item in
+                                NavigationLink(destination: RecipeDetailView(recipe: RecipeDetailItem(
+                                    id: item.id,
+                                    title: item.title,
+                                    detail: nil,
+                                    cookTime: item.cookTime,
+                                    imageURL: item.imageURL,
+                                    ingredients: [],
+                                    isPublic: true,
+                                    authorId: auth.currentUser?.id ?? "",
+                                    steps: []
+                                ))) {
+                                    RecipeRowView(recipe: item)
                                         .padding(8)
                                         .background(Color("itemsListBackground"))
                                         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -52,32 +71,23 @@ struct RecommendationsView: View {
             .navigationTitle("Rekomendacje")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Odśwież") {
-                        viewModel.fetchRecommendations(for: user)
-                    }
+                    Button("Odśwież") { Task { await viewModel.fetchRecommendations(for: auth.currentUser?.id) } }
                 }
             }
-            .onAppear {
-                viewModel.fetchRecommendations(for: user)
-            }
+            .task { await viewModel.fetchRecommendations(for: auth.currentUser?.id) }
+            .onChange(of: viewModel.filterQuick) { _ in Task { await viewModel.fetchRecommendations(for: auth.currentUser?.id) } }
+            .onChange(of: viewModel.filterVegetarian) { _ in Task { await viewModel.fetchRecommendations(for: auth.currentUser?.id) } }
+            .onChange(of: viewModel.maxMissingIngredients) { _ in Task { await viewModel.fetchRecommendations(for: auth.currentUser?.id) } }
         }
     }
 }
 
 struct RecommendationsView_Previews: PreviewProvider {
     static var previews: some View {
-        let context = PersistenceController.shared.container.viewContext
-        let user = User(context: context)
-        user.name = "Jan"
-        let samplePantry = PantryItem(context: context)
-        samplePantry.name = "Mąka"
-        samplePantry.quantity = "1 kg"
-        samplePantry.category = "Pieczywo"
-        samplePantry.owner = user
-        return ZStack {
+        ZStack {
             Color("background").ignoresSafeArea()
-            RecommendationsView(user: user)
-                .environment(\.managedObjectContext, context)
+            RecommendationsView()
+                .environmentObject(AuthViewModel())
         }
     }
 }

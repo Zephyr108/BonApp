@@ -1,25 +1,43 @@
 import SwiftUI
-import CoreData
+
+struct RecipeItem: Identifiable, Decodable {
+    let id: UUID
+    let title: String
+    let cookTime: Int
+    let imageURL: String?
+    let isFavorite: Bool
+}
 
 struct RecipeRowView: View {
-    @ObservedObject var recipe: Recipe
-    @Environment(\.managedObjectContext) private var viewContext
-    @FetchRequest(
-        entity: User.entity(),
-        sortDescriptors: [],
-        predicate: NSPredicate(format: "isCurrent == YES"),
-        animation: .default
-    ) private var users: FetchedResults<User>
+    let recipe: RecipeItem
 
     var body: some View {
         HStack(spacing: 12) {
-            if let imageData = recipe.images, let uiImage = UIImage(data: imageData) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 60, height: 60)
-                    .clipped()
-                    .cornerRadius(6)
+            if let imageURLString = recipe.imageURL, let url = URL(string: imageURLString) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .empty:
+                        ProgressView()
+                            .frame(width: 60, height: 60)
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 60, height: 60)
+                            .clipped()
+                            .cornerRadius(6)
+                    case .failure:
+                        Rectangle()
+                            .fill(Color.secondary.opacity(0.3))
+                            .frame(width: 60, height: 60)
+                            .cornerRadius(6)
+                    @unknown default:
+                        Rectangle()
+                            .fill(Color.secondary.opacity(0.3))
+                            .frame(width: 60, height: 60)
+                            .cornerRadius(6)
+                    }
+                }
             } else {
                 Rectangle()
                     .fill(Color.secondary.opacity(0.3))
@@ -29,11 +47,9 @@ struct RecipeRowView: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text(recipe.title ?? "Brak tytułu")
+                    Text(recipe.title.isEmpty ? "Brak tytułu" : recipe.title)
                         .font(.headline)
-                    if let currentUser = users.first,
-                       let favorites = currentUser.favoriteRecipes as? Set<Recipe>,
-                       favorites.contains(recipe) {
+                    if recipe.isFavorite {
                         Image(systemName: "heart.fill")
                             .foregroundColor(.red)
                     }
@@ -53,34 +69,26 @@ struct RecipeRowView: View {
         .simultaneousGesture(
             TapGesture(count: 2)
                 .onEnded {
-                    guard let currentUser = users.first else { return }
-                    guard let favorites = currentUser.favoriteRecipes as? Set<Recipe> else { return }
-
-                    var updatedFavorites = favorites
-                    if updatedFavorites.contains(recipe) {
-                        updatedFavorites.remove(recipe)
-                    } else {
-                        updatedFavorites.insert(recipe)
-                    }
-
-                    currentUser.favoriteRecipes = NSSet(set: updatedFavorites)
-                    do {
-                        try viewContext.save()
-                    } catch {
-                        print("Failed to update favorites: \(error.localizedDescription)")
-                    }
+                    toggleFavorite()
                 }
         )
+    }
+    
+    private func toggleFavorite() {
+        // Placeholder function to toggle favorite status in Supabase
     }
 }
 
 struct RecipeRowView_Previews: PreviewProvider {
     static var previews: some View {
-        let context = PersistenceController.shared.container.viewContext
-        let sample = Recipe(context: context)
-        sample.title = "Przykładowy przepis"
-        sample.cookTime = 20
-        return RecipeRowView(recipe: sample)
+        let sample = RecipeItem(
+            id: UUID(),
+            title: "Przykładowy przepis",
+            cookTime: 20,
+            imageURL: nil,
+            isFavorite: true
+        )
+        RecipeRowView(recipe: sample)
             .previewLayout(.sizeThatFits)
             .padding()
     }

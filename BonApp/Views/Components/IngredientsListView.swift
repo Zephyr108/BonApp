@@ -1,7 +1,8 @@
 import SwiftUI
+import Supabase
 
 struct IngredientsListView: View {
-    let ingredients: [String]
+    @State private var ingredients: [String] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -13,20 +14,32 @@ struct IngredientsListView: View {
             }
         }
         .padding(.vertical, 8)
+        .task { await loadIngredients() }
     }
+
+    private func loadIngredients() async {
+        do {
+            let client = SupabaseManager.shared.client
+            let rows: [IngredientRow] = try await client.database
+                .from("ingredients")
+                .select("name")
+                .execute()
+                .value
+            self.ingredients = rows.compactMap { $0.name }
+        } catch {
+            print("Failed to load ingredients: \(error.localizedDescription)")
+        }
+    }
+}
+
+private struct IngredientRow: Decodable {
+    let name: String?
 }
 
 struct IngredientsListView_Previews: PreviewProvider {
     static var previews: some View {
-        IngredientsListView(
-            ingredients: [
-                "2 jajka",
-                "200 g mąki",
-                "100 ml mleka",
-                "szczypta soli"
-            ]
-        )
-        .previewLayout(.sizeThatFits)
-        .padding()
+        IngredientsListView()
+            .previewLayout(.sizeThatFits)
+            .padding()
     }
 }

@@ -14,7 +14,8 @@ struct LoginView: View {
 
                     TextField("E-mail", text: $auth.email)
                         .keyboardType(.emailAddress)
-                        .autocapitalization(.none)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled(true)
                         .foregroundColor(Color("textPrimary"))
                         .padding(16)
                         .background(Color("textfieldBackground"))
@@ -53,10 +54,8 @@ struct LoginView: View {
             .background(Color("background").ignoresSafeArea())
             .navigationTitle("Logowanie")
             .navigationBarTitleDisplayMode(.inline)
-            .onChange(of: auth.isAuthenticated) { oldValue, newValue in
-                if newValue {
-                    dismiss()
-                }
+            .onChange(of: auth.isAuthenticated) { isAuth in
+                if isAuth { dismiss() }
             }
         }
     }
@@ -66,6 +65,5 @@ struct LoginView_Previews: PreviewProvider {
     static var previews: some View {
         LoginView()
             .environmentObject(AuthViewModel())
-            .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
     }
 }

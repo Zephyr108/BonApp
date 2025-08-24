@@ -1,77 +1,105 @@
 import Foundation
-import CoreData
+import Supabase
+
+struct PantryItemDTO: Identifiable, Hashable, Decodable {
+    let id: UUID
+    let name: String
+    let quantity: String
+    let category: String?
+    let ownerId: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, quantity, category
+        case ownerId = "owner_id"
+    }
+}
 
 final class PantryViewModel: ObservableObject {
-    @Published var pantryItems: [PantryItem] = []
+    @Published var pantryItems: [PantryItemDTO] = []
+    @Published var isLoading: Bool = false
+    @Published var error: String? = nil
 
-    private let viewContext: NSManagedObjectContext
-    private let user: User
+    private let client = SupabaseManager.shared.client
+    private let userId: String
 
-    // MARK: - Inicjalizacja
-    init(user: User, context: NSManagedObjectContext = PersistenceController.shared.container.viewContext) {
-        self.user = user
-        self.viewContext = context
-        fetchPantryItems()
+    init(userId: String) {
+        self.userId = userId
+        Task { await fetchPantryItems() }
     }
 
     // MARK: - Fetch
-    func fetchPantryItems() {
-        let request: NSFetchRequest<PantryItem> = PantryItem.fetchRequest()
-        request.predicate = NSPredicate(format: "owner == %@", user)
-        request.sortDescriptors = [
-            NSSortDescriptor(keyPath: \PantryItem.category, ascending: true),
-            NSSortDescriptor(keyPath: \PantryItem.name, ascending: true)
-        ]
-
+    @MainActor
+    func fetchPantryItems() async {
+        guard !isLoading else { return }
+        isLoading = true
+        error = nil
+        defer { isLoading = false }
         do {
-            pantryItems = try viewContext.fetch(request)
+            let rows: [PantryItemDTO] = try await client.database
+                .from("pantry")
+                .select("id,name,quantity,category,owner_id")
+                .eq("owner_id", value: userId)
+                .order("category", ascending: true)
+                .order("name", ascending: true)
+                .execute()
+                .value
+            self.pantryItems = rows
         } catch {
-            print("Failed to fetch pantry items: \(error.localizedDescription)")
-            pantryItems = []
+            self.error = error.localizedDescription
+            self.pantryItems = []
         }
     }
 
     // MARK: - Add
-    func addItem(name: String, quantity: String, category: String, owner: User) {
-        let newItem = PantryItem(context: viewContext)
-        newItem.name = name
-        newItem.quantity = quantity
-        newItem.category = category
-        newItem.owner = owner
-
-        saveContext()
-        fetchPantryItems()
+    func addItem(name: String, quantity: String, category: String?) async {
+        let payload: [String: AnyJSON] = [
+            "name": .string(name),
+            "quantity": .string(quantity),
+            "category": (category != nil ? .string(category!) : .null),
+            "owner_id": .string(userId)
+        ]
+        do {
+            _ = try await client.database.from("pantry").insert(payload).execute()
+            await fetchPantryItems()
+        } catch {
+            await MainActor.run { self.error = error.localizedDescription }
+        }
     }
 
     // MARK: - Update
-    func updateItem(_ item: PantryItem, name: String, quantity: String, category: String) {
-        item.name = name
-        item.quantity = quantity
-        item.category = category
-
-        saveContext()
-        fetchPantryItems()
+    func updateItem(id: UUID, name: String, quantity: String, category: String?) async {
+        let payload: [String: AnyJSON] = [
+            "name": .string(name),
+            "quantity": .string(quantity),
+            "category": (category != nil ? .string(category!) : .null)
+        ]
+        do {
+            _ = try await client.database
+                .from("pantry")
+                .update(payload)
+                .eq("id", value: id)
+                .eq("owner_id", value: userId)
+                .execute()
+            await fetchPantryItems()
+        } catch {
+            await MainActor.run { self.error = error.localizedDescription }
+        }
     }
 
     // MARK: - Delete
-    func deleteItem(_ item: PantryItem) {
-        viewContext.delete(item)
-
-        saveContext()
-        fetchPantryItems()
-    }
-
-    //Refresh
-    func refresh() {
-        fetchPantryItems()
-    }
-
-    // MARK: - Helpery
-    private func saveContext() {
+    func deleteItem(id: UUID) async {
         do {
-            try viewContext.save()
+            _ = try await client.database
+                .from("pantry")
+                .delete()
+                .eq("id", value: id)
+                .eq("owner_id", value: userId)
+                .execute()
+            await fetchPantryItems()
         } catch {
-            print("Failed to save pantry changes: \(error.localizedDescription)")
+            await MainActor.run { self.error = error.localizedDescription }
         }
     }
+
+    func refresh() async { await fetchPantryItems() }
 }

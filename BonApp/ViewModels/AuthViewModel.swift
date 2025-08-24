@@ -2,36 +2,60 @@
 //  AuthViewModel.swift
 //  BonApp
 //
-//  Created by Marcin on 28/04/2025.
+//  Migrated to Supabase Auth
 //
 
 import Foundation
-import CoreData
+import Combine
+import Supabase
+
+// MARK: - Helper model for the current user (metadata from Supabase)
+struct AppUser: Equatable {
+    let id: String
+    var email: String
+    var name: String?
+    var preferences: String?
+    var avatarColorHex: String?
+}
+
+// MARK: - Supabase client access
+// Provide your own singleton/DI. Ensure you have Supabase Swift SDK installed.
+// Example:
+// let supabase = SupabaseClient(supabaseURL: URL(string: "https://YOUR-PROJECT.supabase.co")!, supabaseKey: "YOUR_ANON_KEY")
+final class SupabaseManager {
+    static let shared = SupabaseManager()
+    // Replace placeholders with your real URL & anon key.
+    let client: SupabaseClient = SupabaseClient(
+        supabaseURL: URL(string: "https://pksuyabrwexreslizpxp.supabase.co")!,
+        supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBrc3V5YWJyd2V4cmVzbGl6cHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwMTI5NjksImV4cCI6MjA3MDU4ODk2OX0.RFeuz5qS7tyOXh1ph3ltBIQDdUt8WFsuLlWO0m7NEB4"
+    )
+}
 
 final class AuthViewModel: ObservableObject {
-    // MARK: - Dane
+    // MARK: - Inputs
     @Published var email: String = ""
     @Published var password: String = ""
     @Published var name: String = ""
     @Published var preferences: String = ""
-    
-    // MARK: - Statusy
+
+    // MARK: - State
     @Published var isAuthenticated: Bool = false
-    @Published var currentUser: User? = nil
+    @Published var currentUser: AppUser? = nil
     @Published var errorMessage: String? = nil
-    
-    private let viewContext: NSManagedObjectContext
-    
-    init(context: NSManagedObjectContext = PersistenceController.shared.container.viewContext) {
-        self.viewContext = context
-        clearOldSessions()
+
+    private let client: SupabaseClient
+    private var cancellables = Set<AnyCancellable>()
+
+    init(client: SupabaseClient = SupabaseManager.shared.client) {
+        self.client = client
+        // Load session/user at startup
+        Task { await refreshAuthState() }
     }
-    
-    // MARK: - Rejestracja
+
+    // MARK: - Registration (sign up)
     func register() {
         errorMessage = nil
-        
-        //Walidacja
+
         guard Validators.isValidEmail(email) else {
             errorMessage = "InvalidEmail"
             return
@@ -44,65 +68,40 @@ final class AuthViewModel: ObservableObject {
             errorMessage = "Name cannot be empty"
             return
         }
-        
-        //Sprawdzenie maila czy nie jest używany
-        let request: NSFetchRequest<User> = User.fetchRequest()
-        request.predicate = NSPredicate(format: "email ==[c] %@", email)
-        
-        do {
-            let existing = try viewContext.fetch(request)
-            if !existing.isEmpty {
-                errorMessage = "User with this email already exists"
-                return
+
+        Task { @MainActor in
+            do {
+                // Attach initial metadata (name, prefs, avatar)
+                let metadata: [String: AnyJSON] = [
+                    "name": .string(name),
+                    "preferences": preferences.isEmpty ? .null : .string(preferences),
+                    "avatarColorHex": .string("#000000")
+                ]
+
+                _ = try await client.auth.signUp(
+                    email: email,
+                    password: password,
+                    data: metadata
+                )
+
+                // After sign up, depending on your project settings, user may need to confirm email.
+                // We refresh state; if a session exists, user is authenticated.
+                await refreshAuthState()
+                if !isAuthenticated {
+                    errorMessage = "Check your email to confirm the account."
+                }
+            } catch {
+                self.errorMessage = "Registration failed: \(error.localizedDescription)"
             }
-        } catch {
-            errorMessage = "Failed to validate email uniqueness: \(error.localizedDescription)"
-            return
-        }
-        
-        //Tworzenie uż
-        let newUser = User(context: viewContext)
-        newUser.email = email
-        newUser.password = password
-        newUser.name = name
-        newUser.preferences = preferences
-        newUser.avatarColorHex = "#000000"
-        
-        do {
-            markUserAsCurrent(newUser)
-            currentUser = newUser
-            isAuthenticated = true
-            try viewContext.save()
-        } catch {
-            viewContext.delete(newUser)
-            errorMessage = "Registration failed: \(error.localizedDescription)"
         }
     }
-    
-    //Do oznaczenia danego użytkownika jako obecnego żeby tylko jeden na raz był zalogowany
-    func markUserAsCurrent(_ user: User) {
-        let fetchRequest: NSFetchRequest<User> = User.fetchRequest()
-        
-        do {
-            let allUsers = try viewContext.fetch(fetchRequest)
-            for u in allUsers {
-                u.isCurrent = false
-            }
-            user.isCurrent = true
-            try viewContext.save()
-        } catch {
-            print("Failed to mark user as current: \(error.localizedDescription)")
-        }
-    }
-    
-    // MARK: - Update Profile
-    //Update nazwy, preferencji, avatara, maila
+
+    // MARK: - Update profile (user metadata, email, password)
     func updateProfile(name: String, preferences: String, avatarColorHex: String, email: String, password: String) {
-        guard let user = currentUser else {
+        guard currentUser != nil else {
             errorMessage = "No authenticated user."
             return
         }
-        
         guard Validators.isValidEmail(email) else {
             errorMessage = "InvalidEmail"
             return
@@ -116,27 +115,30 @@ final class AuthViewModel: ObservableObject {
             return
         }
 
-        user.name = name
-        user.preferences = preferences.isEmpty ? nil : preferences
-        user.avatarColorHex = avatarColorHex
-        user.email = email
-        user.password = password
+        Task { @MainActor in
+            do {
+                let metadata: [String: AnyJSON] = [
+                    "name": .string(name),
+                    "preferences": preferences.isEmpty ? .null : .string(preferences),
+                    "avatarColorHex": .string(avatarColorHex)
+                ]
 
-        do {
-            print("User object state before save: email=\(user.email ?? "nil"), password=\(user.password ?? "nil"), name=\(user.name ?? "nil"), preferences=\(user.preferences ?? "nil"), avatarColorHex=\(user.avatarColorHex ?? "nil")")
-            try viewContext.save()
-        } catch let error as NSError {
-            if let detailedErrors = error.userInfo[NSDetailedErrorsKey] as? [NSError] {
-                for detailedError in detailedErrors {
-                    print("Validation error: \(detailedError), \(detailedError.userInfo)")
-                }
-            } else {
-                print("Single validation error: \(error), \(error.userInfo)")
+                try await client.auth.update(
+                    user: UserAttributes(
+                        email: email,
+                        password: password,
+                        data: metadata
+                    )
+                )
+
+                // Re-read user and publish
+                await refreshAuthState()
+            } catch {
+                self.errorMessage = "Failed to save profile: \(error.localizedDescription)"
             }
-            errorMessage = "Failed to save profile: \(error.localizedDescription)"
         }
     }
-    
+
     // MARK: - Login
     func login() {
         errorMessage = nil
@@ -150,64 +152,80 @@ final class AuthViewModel: ObservableObject {
             return
         }
 
-        //Fetch pasującego uż
-        let request: NSFetchRequest<User> = User.fetchRequest()
-        request.predicate = NSPredicate(format: "email ==[c] %@ AND password == %@", email, password)
-        request.fetchLimit = 1
-
-        do {
-            let results = try viewContext.fetch(request)
-            if let user = results.first {
-                let allUsers = try viewContext.fetch(User.fetchRequest())
-                for u in allUsers {
-                    u.isCurrent = false
-                }
-
-                user.isCurrent = true
-                currentUser = user
-                isAuthenticated = true
-                try viewContext.save()
-            } else {
-                errorMessage = "Invalid email or password"
+        Task { @MainActor in
+            do {
+                _ = try await client.auth.signIn(email: email, password: password)
+                await refreshAuthState()
+            } catch {
+                self.errorMessage = "Invalid email or password"
             }
-        } catch {
-            errorMessage = "Login failed: \(error.localizedDescription)"
         }
     }
-    
+
     // MARK: - Logout
-    //Wylogowanie obecnego uż
     func logout() {
-        //Fetch wszystkich użytkowników i reset isCurrent
-        let fetchRequest: NSFetchRequest<User> = User.fetchRequest()
-        do {
-            let users = try viewContext.fetch(fetchRequest)
-            for user in users {
-                user.isCurrent = false
+        Task { @MainActor in
+            do {
+                try await client.auth.signOut()
+            } catch {
+                // Even if signOut throws (network), clear local state
+                print("Sign out error: \(error.localizedDescription)")
             }
-            try viewContext.save()
-        } catch {
-            print("Failed to reset isCurrent flags: \(error.localizedDescription)")
+            self.isAuthenticated = false
+            self.currentUser = nil
+            self.email = ""
+            self.password = ""
+            self.name = ""
+            self.preferences = ""
         }
+    }
 
-        isAuthenticated = false
-        currentUser = nil
-        email = ""
-        password = ""
-        name = ""
-        preferences = ""
-    }
-    //Czyszczenie starych sesji przez reset `isCurrent` dla wszystkich uż
-    func clearOldSessions() {
-        let fetchRequest: NSFetchRequest<User> = User.fetchRequest()
+    /// Async sign-out API used by UI (ContentView). Non-throwing.
+    @MainActor
+    func signOut() async {
         do {
-            let users = try viewContext.fetch(fetchRequest)
-            for user in users {
-                user.isCurrent = false
-            }
-            try viewContext.save()
+            try await client.auth.signOut()
         } catch {
-            print("Failed to clear old sessions: \(error.localizedDescription)")
+            // Log but proceed to clear local state
+            print("Sign out error: \(error.localizedDescription)")
+        }
+        self.isAuthenticated = false
+        self.currentUser = nil
+        self.email = ""
+        self.password = ""
+        self.name = ""
+        self.preferences = ""
+    }
+
+    // MARK: - Session/User helpers
+    @MainActor
+    private func refreshAuthState() async {
+        do {
+            // If a session exists, user is considered authenticated
+            let session = try await client.auth.session
+            self.isAuthenticated = (session != nil)
+
+            if let user = try? await client.auth.user() {
+                let meta = (user.userMetadata as? [String: Any]) ?? [:]
+                let appUser = AppUser(
+                    id: user.id.uuidString,
+                    email: user.email ?? "",
+                    name: meta["name"] as? String,
+                    preferences: meta["preferences"] as? String,
+                    avatarColorHex: meta["avatarColorHex"] as? String
+                )
+                self.currentUser = appUser
+            } else {
+                self.currentUser = nil
+            }
+        } catch {
+            // If reading session/user fails, assume logged out
+            self.isAuthenticated = false
+            self.currentUser = nil
         }
     }
+
+    // MARK: - Backwards-compat shim (no-op)
+    // Core Data used to clear local sessions. With Supabase this is handled by the Auth state.
+    func clearOldSessions() {}
 }

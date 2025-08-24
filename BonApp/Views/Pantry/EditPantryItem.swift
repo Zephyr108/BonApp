@@ -1,20 +1,20 @@
 import SwiftUI
-import CoreData
+import Supabase
 
 struct EditPantryItemView: View {
-    @ObservedObject var item: PantryItem
-    @Environment(\.managedObjectContext) private var viewContext
+    let itemId: UUID
     @Environment(\.dismiss) private var dismiss
 
     @State private var name: String
     @State private var quantity: String
     @State private var category: String
+    @State private var isSaving = false
 
-    init(item: PantryItem) {
-        self.item = item
-        _name = State(initialValue: item.name ?? "")
-        _quantity = State(initialValue: item.quantity ?? "")
-        _category = State(initialValue: item.category ?? "")
+    init(itemId: UUID, name: String = "", quantity: String = "", category: String = "") {
+        self.itemId = itemId
+        _name = State(initialValue: name)
+        _quantity = State(initialValue: quantity)
+        _category = State(initialValue: category)
     }
 
     var body: some View {
@@ -63,14 +63,14 @@ struct EditPantryItemView: View {
                                 .stroke(Color("textfieldBorder"), lineWidth: 1)
                         )
                         .cornerRadius(8)
-                    
+
                     Spacer()
-                    Button("Zapisz zmiany") {
+                    Button(isSaving ? "Zapisywanie…" : "Zapisz zmiany") {
                         saveChanges()
                     }
-                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || quantity.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(isSaving || name.trimmingCharacters(in: .whitespaces).isEmpty || quantity.trimmingCharacters(in: .whitespaces).isEmpty)
                     .frame(maxWidth: .infinity, minHeight: 44)
-                    .background(Color("edit"))
+                    .background(isSaving ? Color("textfieldBorder") : Color("edit"))
                     .foregroundColor(Color("buttonText"))
                     .cornerRadius(8)
                 }
@@ -83,28 +83,31 @@ struct EditPantryItemView: View {
     }
 
     private func saveChanges() {
-        item.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        item.quantity = quantity.trimmingCharacters(in: .whitespacesAndNewlines)
-        item.category = category.trimmingCharacters(in: .whitespacesAndNewlines)
-        do {
-            try viewContext.save()
-            dismiss()
-        } catch {
-            print("Błąd zapisu pozycji spiżarni: \(error.localizedDescription)")
+        let newName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let newQty = quantity.trimmingCharacters(in: .whitespacesAndNewlines)
+        let newCat = category.trimmingCharacters(in: .whitespacesAndNewlines)
+        isSaving = true
+        Task {
+            defer { isSaving = false }
+            do {
+                let client = SupabaseManager.shared.client
+                _ = try await client.database
+                    .from("pantry")
+                    .update(["name": newName, "quantity": newQty, "category": newCat])
+                    .eq("id", value: itemId)
+                    .execute()
+                dismiss()
+            } catch {
+                print("Błąd zapisu pozycji spiżarni: \(error.localizedDescription)")
+            }
         }
     }
 }
 
 struct EditPantryItemView_Previews: PreviewProvider {
     static var previews: some View {
-        let context = PersistenceController.shared.container.viewContext
-        let sample = PantryItem(context: context)
-        sample.name = "Mąka"
-        sample.quantity = "1 kg"
-        sample.category = "Pieczywo"
-        return NavigationStack {
-            EditPantryItemView(item: sample)
-                .environment(\.managedObjectContext, context)
+        NavigationStack {
+            EditPantryItemView(itemId: UUID(), name: "Mąka", quantity: "1 kg", category: "Pieczywo")
         }
     }
 }

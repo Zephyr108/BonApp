@@ -88,9 +88,7 @@ struct RegistrationView: View {
 
 struct RegistrationView_Previews: PreviewProvider {
     static var previews: some View {
-        let context = PersistenceController.shared.container.viewContext
         RegistrationView()
-            .environment(\.managedObjectContext, context)
-            .environmentObject(AuthViewModel(context: context))
+            .environmentObject(AuthViewModel())
     }
 }

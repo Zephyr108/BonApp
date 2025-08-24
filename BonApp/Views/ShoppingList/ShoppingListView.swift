@@ -1,10 +1,13 @@
 import SwiftUI
-import CoreData
+import Supabase
 
 struct ShoppingListView: View {
-    @ObservedObject var user: User
-    @StateObject private var viewModel = ShoppingListViewModel()
+    @StateObject private var viewModel: ShoppingListViewModel
     @State private var isShowingAdd = false
+
+    init(ownerId: String) {
+        _viewModel = StateObject(wrappedValue: ShoppingListViewModel(ownerId: ownerId))
+    }
 
 
     var body: some View {
@@ -14,20 +17,19 @@ struct ShoppingListView: View {
                     let item = viewModel.items[index]
                     HStack {
                         Button(action: {
-                            item.isBought.toggle()
-                            viewModel.saveContext()
+                            Task { await viewModel.markAsBought(id: item.id) }
                         }) {
                             Image(systemName: item.isBought ? "checkmark.circle.fill" : "circle")
                                 .foregroundColor(item.isBought ? .green : .primary)
                         }
                         .buttonStyle(PlainButtonStyle())
 
-                        NavigationLink(destination: EditShoppingListItemView(item: item)) {
+                        NavigationLink(destination: Text("Edytuj pozycję")) {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text(item.name ?? "")
+                                Text(item.name)
                                     .font(.headline)
                                     .foregroundColor(Color("textPrimary"))
-                                Text(item.quantity ?? "")
+                                Text(item.quantity)
                                     .font(.subheadline)
                                     .foregroundColor(Color("textSecondary"))
                             }
@@ -54,7 +56,7 @@ struct ShoppingListView: View {
                 }
                 ToolbarItem(placement: .bottomBar) {
                     Button("Dodaj do spiżarni") {
-                        viewModel.transferBoughtItemsToPantry(for: user)
+                        Task { await viewModel.transferBoughtItemsToPantry() }
                     }
                     .foregroundColor(Color("buttonText"))
                     .frame(maxWidth: .infinity)
@@ -66,21 +68,22 @@ struct ShoppingListView: View {
             }
             .sheet(isPresented: $isShowingAdd) {
                 AddShoppingListItemView { name, quantity, category in
-                    viewModel.addItem(name: name, quantity: quantity, category: category, owner: user)
-                    isShowingAdd = false
+                    Task {
+                        await viewModel.addItem(name: name, quantity: quantity, category: category)
+                        isShowingAdd = false
+                    }
                 }
             }        }
     }
 
     private func deleteItems(offsets: IndexSet) {
-        offsets.map { viewModel.items[$0] }.forEach(viewModel.deleteItem)
+        let ids = offsets.map { viewModel.items[$0].id }
+        Task { for id in ids { await viewModel.deleteItem(id: id) } }
     }
 }
 
 struct ShoppingListView_Previews: PreviewProvider {
     static var previews: some View {
-        let user = User(context: PersistenceController.shared.container.viewContext)
-        return ShoppingListView(user: user)
-            .environment(\.managedObjectContext, PersistenceController.shared.container.viewContext)
+        ShoppingListView(ownerId: "00000000-0000-0000-0000-000000000000")
     }
 }

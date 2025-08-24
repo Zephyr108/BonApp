@@ -2,15 +2,33 @@
 //  AddRecipeView.swift
 //  BonApp
 //
-//  Created by Marcin on 28/04/2025.
+//  Migrated to Supabase (no Core Data)
 //
 
 import SwiftUI
-import CoreData
+import Supabase
+import UIKit
+
+private struct RecipeInsertPayload: Encodable {
+    let id: UUID
+    let title: String
+    let detail: String
+    let is_public: Bool
+    let cook_time: Int
+    let image_url: String?
+    let author_id: String
+    let ingredients: [String]
+}
+
+private struct StepInsertPayload: Encodable {
+    let id: UUID
+    let recipe_id: UUID
+    let order: Int
+    let instruction: String
+}
 
 struct AddRecipeView: View {
-    @ObservedObject var user: User
-    @Environment(\.managedObjectContext) private var viewContext
+    @EnvironmentObject var auth: AuthViewModel
     @Environment(\.dismiss) private var dismiss
 
     @State private var title: String = ""
@@ -23,6 +41,9 @@ struct AddRecipeView: View {
 
     @State private var newStepText: String = ""
     @State private var stepTexts: [String] = []
+
+    @State private var isSaving = false
+    @State private var errorMessage: String? = nil
 
     var body: some View {
         NavigationStack {
@@ -74,9 +95,7 @@ struct AddRecipeView: View {
                                 .resizable()
                                 .scaledToFit()
                                 .cornerRadius(8)
-                                .onTapGesture {
-                                    isShowingImagePicker = true
-                                }
+                                .onTapGesture { isShowingImagePicker = true }
                         } else {
                             Button(action: { isShowingImagePicker = true }) {
                                 HStack {
@@ -152,18 +171,19 @@ struct AddRecipeView: View {
                             .disabled(newStepText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                             .padding(16)
                             .background(Color("addStep"))
-                            //.foregroundColor(Color("textPrimary"))
                             .cornerRadius(8)
                         }
                     }
                     .padding(.bottom, 12)
 
-                    Button("Zapisz przepis") {
-                        saveRecipe()
+                    if let errorMessage { Text(errorMessage).foregroundColor(.red) }
+
+                    Button(isSaving ? "Zapisywanie…" : "Zapisz przepis") {
+                        Task { await saveRecipe() }
                     }
-                    .disabled(title.isEmpty || ingredientsText.isEmpty || Int(cookTime) == nil)
+                    .disabled(!canSave || isSaving)
                     .frame(maxWidth: .infinity, minHeight: 44)
-                    .background(Color("edit"))
+                    .background(canSave && !isSaving ? Color("edit") : Color("textfieldBorder"))
                     .foregroundColor(Color("buttonText"))
                     .cornerRadius(8)
                 }
@@ -177,48 +197,86 @@ struct AddRecipeView: View {
         }
     }
 
-    private func saveRecipe() {
-        let newRecipe = Recipe(context: viewContext)
-        newRecipe.title = title
-        newRecipe.detail = detail
-        let items = ingredientsText
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-        newRecipe.ingredients = items as NSArray
-        if let ct = Int16(cookTime) {
-            newRecipe.cookTime = ct
-        }
-        newRecipe.isPublic = isPublic
-        if let uiImage = selectedImage,
-           let data = uiImage.jpegData(compressionQuality: 0.8) {
-            newRecipe.images = data
-        }
-        newRecipe.author = user
+    private var canSave: Bool {
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !ingredientsText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        Int(cookTime.trimmingCharacters(in: .whitespacesAndNewlines)) != nil
+    }
 
-        for (index, instruction) in stepTexts.enumerated() {
-            let step = RecipeStep(context: viewContext)
-            step.instruction = instruction
-            step.order = Int16(index + 1)
-            step.recipe = newRecipe
+    private func saveRecipe() async {
+        guard let userId = auth.currentUser?.id else {
+            await MainActor.run { errorMessage = "Brak zalogowanego użytkownika." }
+            return
         }
+        isSaving = true
+        errorMessage = nil
+        defer { isSaving = false }
+
+        let client = SupabaseManager.shared.client
+        let recipeId = UUID()
+        let cookTimeInt = Int(cookTime.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+        let ingredientsArray = ingredientsText
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
 
         do {
-            try viewContext.save()
-            dismiss()
+            // 1) Upload image if provided
+            var imageURL: String? = nil
+            if let img = selectedImage, let data = img.jpegData(compressionQuality: 0.85) {
+                let path = "\(userId)/recipes/\(recipeId).jpg"
+                _ = try await client.storage
+                    .from("recipes")
+                    .upload(path: path, file: data, options: FileOptions(cacheControl: "3600", contentType: "image/jpeg", upsert: true))
+                // Public URL (assuming bucket is public). If not public, you can create a signed URL.
+                imageURL = try client.storage.from("recipes").getPublicURL(path: path).absoluteString
+            }
+
+            // 2) Insert recipe
+            let recipeInsert = RecipeInsertPayload(
+                id: recipeId,
+                title: title,
+                detail: detail,
+                is_public: isPublic,
+                cook_time: cookTimeInt,
+                image_url: imageURL,
+                author_id: userId,
+                ingredients: ingredientsArray
+            )
+
+            _ = try await client.database
+                .from("recipes")
+                .insert(recipeInsert)
+                .execute()
+
+            // 3) Insert steps (if any)
+            if !stepTexts.isEmpty {
+                let stepsPayload: [StepInsertPayload] = stepTexts.enumerated().map { (index, text) in
+                    StepInsertPayload(
+                        id: UUID(),
+                        recipe_id: recipeId,
+                        order: index + 1,
+                        instruction: text
+                    )
+                }
+                _ = try await client.database
+                    .from("recipe_steps")
+                    .insert(stepsPayload)
+                    .execute()
+            }
+
+            await MainActor.run { dismiss() }
         } catch {
-            print("Błąd zapisu nowego przepisu: \(error.localizedDescription)")
+            await MainActor.run { errorMessage = error.localizedDescription }
         }
     }
 }
 
 struct AddRecipeView_Previews: PreviewProvider {
     static var previews: some View {
-        let context = PersistenceController.shared.container.viewContext
-        let sampleUser = User(context: context)
-        sampleUser.name = "Jan"
-        return NavigationStack {
-            AddRecipeView(user: sampleUser)
-                .environment(\.managedObjectContext, context)
+        NavigationStack {
+            AddRecipeView()
+                .environmentObject(AuthViewModel())
         }
     }
 }

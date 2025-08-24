@@ -2,38 +2,19 @@
 //  ProfileSetupView.swift
 //  BonApp
 //
-//  Created by Marcin on 28/04/2025.
-//
 
 import Foundation
-
 import SwiftUI
-import CoreData
 
 struct ProfileSetupView: View {
-    @ObservedObject var user: User
-    @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var auth: AuthViewModel
 
-    @State private var name: String
-    @State private var preferences: String
-    @State private var avatarColor: Color
-    @State private var email: String
-    @State private var password: String
-
-    init(user: User) {
-        self.user = user
-        _name = State(initialValue: user.name ?? "")
-        _preferences = State(initialValue: user.preferences ?? "")
-        if let hex = user.avatarColorHex, let color = Color(hex: hex) {
-            _avatarColor = State(initialValue: color)
-        } else {
-            _avatarColor = State(initialValue: .blue)
-        }
-        _email = State(initialValue: user.email ?? "")
-        _password = State(initialValue: user.password ?? "")
-    }
+    @State private var name: String = ""
+    @State private var preferences: String = ""
+    @State private var avatarColor: Color = .blue
+    @State private var email: String = ""
+    @State private var password: String = ""
 
     var body: some View {
         NavigationStack {
@@ -104,6 +85,9 @@ struct ProfileSetupView: View {
 
                     TextField("Email", text: $email)
                         .foregroundColor(Color("textPrimary"))
+                        .textInputAutocapitalization(.never)
+                        .keyboardType(.emailAddress)
+                        .autocorrectionDisabled(true)
                         .padding(16)
                         .background(Color("textfieldBackground"))
                         .overlay(
@@ -129,9 +113,9 @@ struct ProfileSetupView: View {
                     Button("Zapisz profil") {
                         saveProfile()
                     }
-                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(!canSave)
                     .frame(maxWidth: .infinity, minHeight: 44)
-                    .background(Color("edit"))
+                    .background(canSave ? Color("edit") : Color("textfieldBorder"))
                     .foregroundColor(Color("buttonText"))
                     .cornerRadius(8)
 
@@ -148,44 +132,41 @@ struct ProfileSetupView: View {
             .navigationTitle("Ustaw profil")
             .navigationBarTitleDisplayMode(.inline)
             .background(Color("background").ignoresSafeArea())
+            .onAppear { syncFromAuthIfNeeded() }
+            .onChange(of: auth.currentUser) { _ in syncFromAuthIfNeeded() }
         }
     }
 
-    let NSValidationErrorKey = "NSValidationErrorKey"
+    private var canSave: Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !password.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func syncFromAuthIfNeeded() {
+        guard let u = auth.currentUser else { return }
+        if name.isEmpty { name = u.name ?? "" }
+        if preferences.isEmpty { preferences = u.preferences ?? "" }
+        if email.isEmpty { email = u.email }
+        if let hex = u.avatarColorHex, let c = Color(hex: hex) { avatarColor = c }
+    }
 
     private func saveProfile() {
-        user.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        user.preferences = preferences.trimmingCharacters(in: .whitespacesAndNewlines)
-        user.avatarColorHex = avatarColor.toHex()
-        user.email = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        user.password = password.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedPrefs = preferences.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedPass = password.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hex = avatarColor.toHex() ?? "#000000"
 
-        do {
-            guard !(user.email?.isEmpty ?? true), !(user.password?.isEmpty ?? true) else {
-                print("Email i hasło są wymagane.")
-                return
-            }
-
-            if user.managedObjectContext == nil {
-                viewContext.insert(user)
-            }
-
-            try viewContext.obtainPermanentIDs(for: [user])
-            try viewContext.save()
-            dismiss()
-        } catch let nsError as NSError {
-            if let detailedErrors = nsError.userInfo[NSDetailedErrorsKey] as? [NSError] {
-                for detailedError in detailedErrors {
-                    if let key = detailedError.userInfo[NSValidationErrorKey] {
-                        print("Walidacja błędu (\(key)): \(detailedError.localizedDescription)")
-                    } else {
-                        print("Szczegółowy błąd zapisu: \(detailedError.localizedDescription)")
-                    }
-                }
-            } else {
-                print("Błąd zapisu profilu: \(nsError), \(nsError.userInfo)")
-            }
-        }
+        auth.updateProfile(
+            name: trimmedName,
+            preferences: trimmedPrefs,
+            avatarColorHex: hex,
+            email: trimmedEmail,
+            password: trimmedPass
+        )
+        // Zamykamy widok po zapisaniu (AuthViewModel odświeży stan)
+        dismiss()
     }
 
     private func logout() {
@@ -196,12 +177,7 @@ struct ProfileSetupView: View {
 
 struct ProfileSetupView_Previews: PreviewProvider {
     static var previews: some View {
-        let context = PersistenceController.shared.container.viewContext
-        let sampleUser = User(context: context)
-        sampleUser.name = "Jan"
-        sampleUser.preferences = "Wegetariańskie"
-        return ProfileSetupView(user: sampleUser)
-            .environment(\.managedObjectContext, context)
+        ProfileSetupView()
             .environmentObject(AuthViewModel())
     }
 }

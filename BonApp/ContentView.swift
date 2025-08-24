@@ -1,84 +1,83 @@
 import SwiftUI
-import CoreData
 
 struct ContentView: View {
-    @Environment(\.managedObjectContext) private var viewContext
-    @StateObject private var auth = AuthViewModel()
+    @EnvironmentObject var auth: AuthViewModel
+
+    private var currentUser: AppUser? { auth.currentUser }
 
     var body: some View {
-        let currentUser: User? = {
-            if auth.isAuthenticated {
-                return auth.currentUser
-            } else {
-                return nil
-            }
-        }()
         TabView {
             RecipeListView()
                 .tabItem { Label("Przepisy", systemImage: "book") }
-            
-            if auth.isAuthenticated, let user = currentUser {
-                PantryView(user: user)
+
+            if let user = currentUser {
+                PantryView()
                     .tabItem { Label("Spiżarnia", systemImage: "tray.fill") }
-                
-                ShoppingListView(user: user)
+
+                ShoppingListView(ownerId: user.id)
                     .tabItem { Label("Zakupy", systemImage: "cart.fill") }
             } else {
                 EmptyView().tabItem { Label("Spiżarnia", systemImage: "tray.fill") }
                 EmptyView().tabItem { Label("Zakupy", systemImage: "cart.fill") }
             }
-            
+
             NavigationStack {
-                if auth.isAuthenticated, let user = currentUser {
-                    ProfileSetupView(user: user)
-                } else {
-                    ZStack {
-                        Color("background").ignoresSafeArea()
-                        VStack(spacing: 16) {
-                            NavigationLink(destination: LoginView()) {
-                                Text("Zaloguj")
-                                    .foregroundColor(Color("buttonText"))
-                                    .frame(maxWidth: .infinity, minHeight: 44)
-                                    .background(Color("login"))
-                                    .cornerRadius(8)
-                                    .padding(.horizontal)
-                            }
-                            NavigationLink(destination: RegistrationView()) {
-                                Text("Rejestracja")
-                                    .foregroundColor(Color("buttonText"))
-                                    .frame(maxWidth: .infinity, minHeight: 44)
-                                    .background(Color("register"))
-                                    .cornerRadius(8)
-                                    .padding(.horizontal)
-                            }
-                        }
-                    }
+                accountContent
                     .navigationTitle("Konto")
-                }
             }
             .background(Color("background").ignoresSafeArea())
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    NavigationLink(destination: SettingsView(user: auth.currentUser ?? User(context: viewContext))) {
-                        Image(systemName: "gearshape")
+            .tabItem { Label("Konto", systemImage: "person.crop.circle") }
+        }
+        .background(Color("background").ignoresSafeArea())
+    }
+
+    @ViewBuilder
+    private var accountContent: some View {
+        if let user = currentUser {
+            ZStack {
+                Color("background").ignoresSafeArea()
+                VStack(spacing: 12) {
+                    Text("Zalogowano jako \(user.email)")
+                        .foregroundColor(Color("textPrimary"))
+                    Button("Wyloguj") {
+                        Task { await auth.signOut() }
+                    }
+                    .foregroundColor(Color("buttonText"))
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .background(Color("register"))
+                    .cornerRadius(8)
+                    .padding(.horizontal)
+                }
+            }
+        } else {
+            ZStack {
+                Color("background").ignoresSafeArea()
+                VStack(spacing: 16) {
+                    NavigationLink(destination: LoginView()) {
+                        Text("Zaloguj")
+                            .foregroundColor(Color("buttonText"))
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .background(Color("login"))
+                            .cornerRadius(8)
+                            .padding(.horizontal)
+                    }
+                    NavigationLink(destination: RegistrationView()) {
+                        Text("Rejestracja")
+                            .foregroundColor(Color("buttonText"))
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .background(Color("register"))
+                            .cornerRadius(8)
+                            .padding(.horizontal)
                     }
                 }
             }
-            .tabItem { Label("Konto", systemImage: "person.crop.circle") }
         }
-        .environmentObject(auth)
-        .background(Color("background").ignoresSafeArea())
     }
 }
 
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
-        let context = PersistenceController.shared.container.viewContext
-        let sampleUser = User(context: context)
-        sampleUser.name = "Jan"
-        sampleUser.email = "jan@example.com"
-        sampleUser.password = "Password1"
-        return ContentView()
-            .environment(\.managedObjectContext, context)
+        ContentView()
+            .environmentObject(AuthViewModel())
     }
 }
