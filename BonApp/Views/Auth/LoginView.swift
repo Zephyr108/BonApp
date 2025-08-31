@@ -41,7 +41,7 @@ struct LoginView: View {
                     }
 
                     Button("Zaloguj") {
-                        auth.login()
+                        Task { await auth.login() }
                     }
                     .disabled(auth.email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || auth.password.isEmpty)
                     .frame(maxWidth: .infinity, minHeight: 44)
@@ -54,7 +54,7 @@ struct LoginView: View {
             .background(Color("background").ignoresSafeArea())
             .navigationTitle("Logowanie")
             .navigationBarTitleDisplayMode(.inline)
-            .onChange(of: auth.isAuthenticated) { isAuth in
+            .onChange(of: auth.isAuthenticated) { _, isAuth in
                 if isAuth { dismiss() }
             }
         }

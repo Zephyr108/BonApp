@@ -17,7 +17,7 @@ struct RecipeDTO: Identifiable, Hashable, Decodable {
         case cookTime = "cook_time"
         case imageURL = "image_url"
         case isPublic = "is_public"
-        case authorId = "author_id"
+        case authorId = "user_id"
     }
 }
 
@@ -41,7 +41,7 @@ private struct RecipeInsert: Encodable {
     let cook_time: Int
     let image_url: String?
     let is_public: Bool
-    let author_id: String
+    let user_id: String
 }
 
 private struct RecipeUpdate: Encodable {
@@ -83,7 +83,7 @@ final class RecipeViewModel: ObservableObject {
         do {
             let rows: [RecipeDTO] = try await client.database
                 .from("recipes")
-                .select("id,title,detail,ingredients,cook_time,image_url,is_public,author_id")
+                .select("id,title,detail,ingredients,cook_time,image_url,is_public,user_id")
                 .order("title", ascending: true)
                 .execute()
                 .value
@@ -132,7 +132,7 @@ final class RecipeViewModel: ObservableObject {
                 cook_time: cookTime,
                 image_url: imageURL,
                 is_public: isPublic,
-                author_id: authorId
+                user_id: authorId
             )
 
             _ = try await client.database

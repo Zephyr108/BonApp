@@ -23,7 +23,7 @@ struct RecipeDetailItem: Identifiable, Hashable, Decodable {
     let imageURL: String?
     let ingredients: [String]
     let isPublic: Bool
-    let authorId: String
+    let userId: String
     let steps: [RecipeStepItem]
 }
 
@@ -88,7 +88,7 @@ struct RecipeDetailView: View {
         .navigationTitle("Szczegóły przepisu")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if let user = auth.currentUser, user.id == recipe.authorId {
+            if let user = auth.currentUser, user.id == recipe.userId {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     NavigationLink(destination: EditRecipeView(
                         recipeId: recipe.id,
@@ -122,7 +122,7 @@ struct RecipeDetailView_Previews: PreviewProvider {
             imageURL: nil,
             ingredients: ["1 jajko", "200g mąki", "100ml mleka"],
             isPublic: true,
-            authorId: "00000000-0000-0000-0000-000000000000",
+            userId: "00000000-0000-0000-0000-000000000000",
             steps: [
                 RecipeStepItem(id: UUID(), order: 1, instruction: "Wymieszaj składniki"),
                 RecipeStepItem(id: UUID(), order: 2, instruction: "Smaż na patelni")

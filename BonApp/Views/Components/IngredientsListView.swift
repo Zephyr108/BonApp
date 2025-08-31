@@ -20,8 +20,8 @@ struct IngredientsListView: View {
     private func loadIngredients() async {
         do {
             let client = SupabaseManager.shared.client
-            let rows: [IngredientRow] = try await client.database
-                .from("ingredients")
+            let rows: [ProductRow] = try await client.database
+                .from("products")
                 .select("name")
                 .execute()
                 .value
@@ -32,7 +32,7 @@ struct IngredientsListView: View {
     }
 }
 
-private struct IngredientRow: Decodable {
+private struct ProductRow: Decodable {
     let name: String?
 }
 

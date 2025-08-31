@@ -49,8 +49,8 @@ struct RecommendationsView: View {
                                     cookTime: item.cookTime,
                                     imageURL: item.imageURL,
                                     ingredients: [],
-                                    isPublic: true,
-                                    authorId: auth.currentUser?.id ?? "",
+                                    isPublic: item.isPublic,
+                                    userId: item.authorId,
                                     steps: []
                                 ))) {
                                     RecipeRowView(recipe: item)
@@ -75,9 +75,9 @@ struct RecommendationsView: View {
                 }
             }
             .task { await viewModel.fetchRecommendations(for: auth.currentUser?.id) }
-            .onChange(of: viewModel.filterQuick) { _ in Task { await viewModel.fetchRecommendations(for: auth.currentUser?.id) } }
-            .onChange(of: viewModel.filterVegetarian) { _ in Task { await viewModel.fetchRecommendations(for: auth.currentUser?.id) } }
-            .onChange(of: viewModel.maxMissingIngredients) { _ in Task { await viewModel.fetchRecommendations(for: auth.currentUser?.id) } }
+            .onChange(of: viewModel.filterQuick) { _, _ in Task { await viewModel.fetchRecommendations(for: auth.currentUser?.id) } }
+            .onChange(of: viewModel.filterVegetarian) { _, _ in Task { await viewModel.fetchRecommendations(for: auth.currentUser?.id) } }
+            .onChange(of: viewModel.maxMissingIngredients) { _, _ in Task { await viewModel.fetchRecommendations(for: auth.currentUser?.id) } }
         }
     }
 }

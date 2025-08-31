@@ -4,40 +4,55 @@ import Supabase
 // MARK: - DTOs
 struct ShoppingListItemDTO: Identifiable, Hashable, Decodable {
     let id: UUID
-    let name: String
-    let quantity: String
+    let productId: Int
+    let quantity: Double
     let isBought: Bool
-    let category: String?
-    let ownerId: String
+    let userId: String
+    let productName: String
+    let productCategoryId: Int?
 
-    enum CodingKeys: String, CodingKey {
-        case id, name, quantity, category
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case productId = "product_id"
+        case quantity
         case isBought = "is_bought"
-        case ownerId = "owner_id"
+        case userId = "user_id"
+        case product
+    }
+
+    private struct ProductEmbed: Decodable { let id: Int; let name: String; let product_category_id: Int? }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        productId = try c.decode(Int.self, forKey: .productId)
+        quantity = try c.decode(Double.self, forKey: .quantity)
+        isBought = try c.decode(Bool.self, forKey: .isBought)
+        userId = try c.decode(String.self, forKey: .userId)
+        let p = try c.decode(ProductEmbed.self, forKey: .product)
+        productName = p.name
+        productCategoryId = p.product_category_id
     }
 }
 
 private struct ShoppingInsert: Encodable {
-    let name: String
-    let quantity: String
+    let user_id: String
+    let product_id: Int
+    let quantity: Double
     let is_bought: Bool
-    let owner_id: String
-    let category: String?
 }
 
 private struct ShoppingUpdate: Encodable {
-    let name: String
-    let quantity: String
+    let product_id: Int
+    let quantity: Double
 }
 
 private struct BoughtUpdate: Encodable { let is_bought: Bool }
 
 private struct PantryInsert: Encodable {
-    let id: UUID
-    let name: String
-    let quantity: String
-    let category: String?
-    let owner_id: String
+    let user_id: String
+    let product_id: Int
+    let quantity: Double
 }
 
 final class ShoppingListViewModel: ObservableObject {
@@ -46,11 +61,11 @@ final class ShoppingListViewModel: ObservableObject {
     @Published var error: String? = nil
 
     private let client = SupabaseManager.shared.client
-    private let ownerId: String
+    private let userId: String
 
     // MARK: - Init
-    init(ownerId: String) {
-        self.ownerId = ownerId
+    init(ownerId: String) { // keep external API stable
+        self.userId = ownerId
         Task { await fetchItems() }
     }
 
@@ -65,10 +80,10 @@ final class ShoppingListViewModel: ObservableObject {
         do {
             let rows: [ShoppingListItemDTO] = try await client.database
                 .from("shopping_list")
-                .select("id,name,quantity,is_bought,category,owner_id")
-                .eq("owner_id", value: ownerId)
+                .select("id,product_id,quantity,is_bought,user_id,product:product_id(id,name,product_category_id)")
+                .eq("user_id", value: userId)
                 .order("is_bought", ascending: true)
-                .order("name", ascending: true)
+                .order("id", ascending: true)
                 .execute()
                 .value
             self.items = rows
@@ -79,8 +94,8 @@ final class ShoppingListViewModel: ObservableObject {
     }
 
     // MARK: - Add
-    func addItem(name: String, quantity: String, category: String?) async {
-        let payload = ShoppingInsert(name: name, quantity: quantity, is_bought: false, owner_id: ownerId, category: category)
+    func addItem(productId: Int, quantity: Double) async {
+        let payload = ShoppingInsert(user_id: userId, product_id: productId, quantity: quantity, is_bought: false)
         do {
             _ = try await client.database.from("shopping_list").insert(payload).execute()
             await fetchItems()
@@ -90,14 +105,14 @@ final class ShoppingListViewModel: ObservableObject {
     }
 
     // MARK: - Update
-    func updateItem(id: UUID, name: String, quantity: String) async {
-        let payload = ShoppingUpdate(name: name, quantity: quantity)
+    func updateItem(id: UUID, productId: Int, quantity: Double) async {
+        let payload = ShoppingUpdate(product_id: productId, quantity: quantity)
         do {
             _ = try await client.database
                 .from("shopping_list")
                 .update(payload)
                 .eq("id", value: id)
-                .eq("owner_id", value: ownerId)
+                .eq("user_id", value: userId)
                 .execute()
             await fetchItems()
         } catch {
@@ -112,7 +127,7 @@ final class ShoppingListViewModel: ObservableObject {
                 .from("shopping_list")
                 .delete()
                 .eq("id", value: id)
-                .eq("owner_id", value: ownerId)
+                .eq("user_id", value: userId)
                 .execute()
             await fetchItems()
         } catch {
@@ -127,7 +142,7 @@ final class ShoppingListViewModel: ObservableObject {
                 .from("shopping_list")
                 .update(BoughtUpdate(is_bought: true))
                 .eq("id", value: id)
-                .eq("owner_id", value: ownerId)
+                .eq("user_id", value: userId)
                 .execute()
             await fetchItems()
         } catch {
@@ -138,33 +153,30 @@ final class ShoppingListViewModel: ObservableObject {
     // MARK: - Transfer bought items to pantry
     func transferBoughtItemsToPantry() async {
         do {
-            // 1) Pobierz kupione pozycje bieżącego użytkownika
-            struct Row: Decodable { let id: UUID; let name: String; let quantity: String; let category: String? }
+            struct Row: Decodable { let id: UUID; let product_id: Int; let quantity: Double }
             let rows: [Row] = try await client.database
                 .from("shopping_list")
-                .select("id,name,quantity,category")
-                .eq("owner_id", value: ownerId)
+                .select("id,product_id,quantity")
+                .eq("user_id", value: userId)
                 .eq("is_bought", value: true)
                 .execute()
                 .value
             guard !rows.isEmpty else { return }
 
-            // 2) Zbuduj payload do tabeli pantry (batch insert)
             let pantryPayload: [PantryInsert] = rows.map { r in
-                PantryInsert(id: UUID(), name: r.name, quantity: r.quantity, category: r.category, owner_id: ownerId)
+                PantryInsert(user_id: userId, product_id: r.product_id, quantity: r.quantity)
             }
             _ = try await client.database
                 .from("pantry")
                 .insert(pantryPayload)
                 .execute()
 
-            // 3) Usuń kupione pozycje z listy zakupów
             let ids = rows.map { $0.id }
             _ = try await client.database
                 .from("shopping_list")
                 .delete()
                 .in("id", values: ids)
-                .eq("owner_id", value: ownerId)
+                .eq("user_id", value: userId)
                 .execute()
 
             await fetchItems()

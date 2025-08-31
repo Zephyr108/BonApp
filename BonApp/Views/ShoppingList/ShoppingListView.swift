@@ -24,12 +24,14 @@ struct ShoppingListView: View {
                         }
                         .buttonStyle(PlainButtonStyle())
 
-                        NavigationLink(destination: Text("Edytuj pozycję")) {
+                        NavigationLink(
+                            destination: EditShoppingListItemView(itemId: item.id, productId: item.productId, quantity: item.quantity)
+                        ) {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text(item.name)
+                                Text(item.productName)
                                     .font(.headline)
                                     .foregroundColor(Color("textPrimary"))
-                                Text(item.quantity)
+                                Text(String(format: "%.2f", item.quantity))
                                     .font(.subheadline)
                                     .foregroundColor(Color("textSecondary"))
                             }
@@ -67,9 +69,9 @@ struct ShoppingListView: View {
                 }
             }
             .sheet(isPresented: $isShowingAdd) {
-                AddShoppingListItemView { name, quantity, category in
+                AddShoppingListItemView { productId, qty in
                     Task {
-                        await viewModel.addItem(name: name, quantity: quantity, category: category)
+                        await viewModel.addItem(productId: productId, quantity: qty)
                         isShowingAdd = false
                     }
                 }

@@ -5,7 +5,18 @@ struct RecipeItem: Identifiable, Decodable {
     let title: String
     let cookTime: Int
     let imageURL: String?
-    let isFavorite: Bool
+    let isPublic: Bool
+    let authorId: String
+    let isFavorite: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case id, title
+        case cookTime = "cook_time"
+        case imageURL = "image_url"
+        case isPublic = "is_public"
+        case authorId = "user_id"
+        case isFavorite = "is_favorite"
+    }
 }
 
 struct RecipeRowView: View {
@@ -49,7 +60,7 @@ struct RecipeRowView: View {
                 HStack {
                     Text(recipe.title.isEmpty ? "Brak tytułu" : recipe.title)
                         .font(.headline)
-                    if recipe.isFavorite {
+                    if recipe.isFavorite == true {
                         Image(systemName: "heart.fill")
                             .foregroundColor(.red)
                     }
@@ -86,6 +97,8 @@ struct RecipeRowView_Previews: PreviewProvider {
             title: "Przykładowy przepis",
             cookTime: 20,
             imageURL: nil,
+            isPublic: true,
+            authorId: "user123",
             isFavorite: true
         )
         RecipeRowView(recipe: sample)

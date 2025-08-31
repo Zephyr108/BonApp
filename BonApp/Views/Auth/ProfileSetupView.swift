@@ -120,7 +120,7 @@ struct ProfileSetupView: View {
                     .cornerRadius(8)
 
                     Button("Wyloguj") {
-                        logout()
+                        Task { await auth.signOut(); dismiss() }
                     }
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .background(Color("logout"))
@@ -133,7 +133,7 @@ struct ProfileSetupView: View {
             .navigationBarTitleDisplayMode(.inline)
             .background(Color("background").ignoresSafeArea())
             .onAppear { syncFromAuthIfNeeded() }
-            .onChange(of: auth.currentUser) { _ in syncFromAuthIfNeeded() }
+            .onChange(of: auth.currentUser) { _, _ in syncFromAuthIfNeeded() }
         }
     }
 
@@ -165,12 +165,7 @@ struct ProfileSetupView: View {
             email: trimmedEmail,
             password: trimmedPass
         )
-        // Zamykamy widok po zapisaniu (AuthViewModel odświeży stan)
-        dismiss()
-    }
-
-    private func logout() {
-        auth.logout()
+        // AuthViewModel odświeży stan; zamknij po wywołaniu
         dismiss()
     }
 }

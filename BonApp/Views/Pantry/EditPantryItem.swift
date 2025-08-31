@@ -4,36 +4,34 @@ import Supabase
 struct EditPantryItemView: View {
     let itemId: UUID
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var auth: AuthViewModel
 
-    @State private var name: String
+    @State private var selectedProductId: Int?
     @State private var quantity: String
-    @State private var category: String
+    @State private var products: [ProductRow] = []
     @State private var isSaving = false
 
-    init(itemId: UUID, name: String = "", quantity: String = "", category: String = "") {
+    init(itemId: UUID, productId: Int? = nil, quantity: String = "") {
         self.itemId = itemId
-        _name = State(initialValue: name)
+        _selectedProductId = State(initialValue: productId)
         _quantity = State(initialValue: quantity)
-        _category = State(initialValue: category)
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
-                    Text("Nazwa produktu")
+                    Text("Produkt")
                         .foregroundColor(Color("textSecondary"))
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                    TextField("Nazwa", text: $name)
-                        .foregroundColor(Color("textPrimary"))
-                        .padding(16)
-                        .background(Color("textfieldBackground"))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color("textfieldBorder"), lineWidth: 1)
-                        )
-                        .cornerRadius(8)
+                    Picker("Wybierz produkt", selection: $selectedProductId) {
+                        ForEach(products) { product in
+                            Text(product.name).tag(Optional(product.id))
+                        }
+                    }
+                    .pickerStyle(MenuPickerStyle())
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                     Text("Ilość")
                         .foregroundColor(Color("textSecondary"))
@@ -50,25 +48,11 @@ struct EditPantryItemView: View {
                         )
                         .cornerRadius(8)
 
-                    Text("Kategoria")
-                        .foregroundColor(Color("textSecondary"))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    TextField("Kategoria", text: $category)
-                        .foregroundColor(Color("textPrimary"))
-                        .padding(16)
-                        .background(Color("textfieldBackground"))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color("textfieldBorder"), lineWidth: 1)
-                        )
-                        .cornerRadius(8)
-
                     Spacer()
                     Button(isSaving ? "Zapisywanie…" : "Zapisz zmiany") {
                         saveChanges()
                     }
-                    .disabled(isSaving || name.trimmingCharacters(in: .whitespaces).isEmpty || quantity.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(isSaving || selectedProductId == nil || quantity.trimmingCharacters(in: .whitespaces).isEmpty)
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .background(isSaving ? Color("textfieldBorder") : Color("edit"))
                     .foregroundColor(Color("buttonText"))
@@ -79,22 +63,40 @@ struct EditPantryItemView: View {
             .background(Color("background").ignoresSafeArea())
             .navigationTitle("Edytuj pozycję spiżarni")
             .navigationBarTitleDisplayMode(.inline)
+            .task { await loadProducts() }
+        }
+    }
+
+    private func loadProducts() async {
+        do {
+            let rows: [ProductRow] = try await SupabaseManager.shared.client.database
+                .from("products")
+                .select("id,name,product_category_id")
+                .order("name")
+                .execute()
+                .value
+            self.products = rows
+            // Jeśli nie ustawiono wstępnie produktu, spróbuj zostawić bez zmian (użytkownik wybierze z menu)
+        } catch {
+            print("Błąd ładowania produktów: \(error.localizedDescription)")
         }
     }
 
     private func saveChanges() {
-        let newName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let newQty = quantity.trimmingCharacters(in: .whitespacesAndNewlines)
-        let newCat = category.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let prodId = selectedProductId else { return }
+        let qty = Double(quantity.replacingOccurrences(of: ",", with: ".")) ?? 1.0
         isSaving = true
         Task {
             defer { isSaving = false }
             do {
                 let client = SupabaseManager.shared.client
+                struct UpdatePayload: Encodable { let product_id: Int; let quantity: Double }
+                let payload = UpdatePayload(product_id: prodId, quantity: qty)
                 _ = try await client.database
                     .from("pantry")
-                    .update(["name": newName, "quantity": newQty, "category": newCat])
+                    .update(payload)
                     .eq("id", value: itemId)
+                    .eq("user_id", value: auth.currentUser?.id ?? "")
                     .execute()
                 dismiss()
             } catch {
@@ -104,10 +106,17 @@ struct EditPantryItemView: View {
     }
 }
 
+private struct ProductRow: Decodable, Identifiable {
+    let id: Int
+    let name: String
+    let product_category_id: Int?
+}
+
 struct EditPantryItemView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            EditPantryItemView(itemId: UUID(), name: "Mąka", quantity: "1 kg", category: "Pieczywo")
+            EditPantryItemView(itemId: UUID(), productId: 1, quantity: "2.0")
+                .environmentObject(AuthViewModel())
         }
     }
 }

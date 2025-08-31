@@ -16,6 +16,25 @@ final class RecommendationsViewModel: ObservableObject {
 
     private let client = SupabaseManager.shared.client
 
+    private struct RecommendationRow: Decodable {
+        let id: UUID
+        let title: String
+        let cook_time: Int
+        let image_url: String?
+        let is_favorite: Bool?
+        let is_public: Bool
+        let user_id: String
+
+        enum CodingKeys: String, CodingKey {
+            case id, title
+            case cook_time
+            case image_url
+            case is_favorite
+            case is_public
+            case user_id
+        }
+    }
+
     private struct RecommendationsParams: Encodable {
         let p_user_id: String
         let p_max_missing: Int
@@ -46,8 +65,7 @@ final class RecommendationsViewModel: ObservableObject {
                 p_budget: filterBudget
             )
 
-            struct Row: Decodable { let id: UUID; let title: String; let cook_time: Int; let image_url: String?; let is_favorite: Bool? }
-            let rows: [Row] = try await client.database
+            let rows: [RecommendationRow] = try await client.database
                 .rpc("get_recommendations", params: params)
                 .execute()
                 .value
@@ -58,6 +76,8 @@ final class RecommendationsViewModel: ObservableObject {
                     title: row.title,
                     cookTime: row.cook_time,
                     imageURL: row.image_url,
+                    isPublic: row.is_public,
+                    authorId: row.user_id,
                     isFavorite: row.is_favorite ?? false
                 )
             }

@@ -17,7 +17,7 @@ struct RecipeListItem: Identifiable, Hashable, Decodable {
         case cookTime = "cook_time"
         case imageURL = "image_url"
         case isPublic = "is_public"
-        case authorId = "author_id"
+        case authorId = "user_id"
     }
 }
 
@@ -44,7 +44,7 @@ final class RecipeListViewModel: ObservableObject {
         do {
             let rows: [RecipeListItem] = try await client.database
                 .from("recipes")
-                .select("id,title,detail,cook_time,image_url,is_public,author_id,ingredients")
+                .select("id,title,detail,cook_time,image_url,is_public,user_id,ingredients")
                 .order("title", ascending: true)
                 .execute()
                 .value
@@ -159,6 +159,8 @@ struct RecipeListView: View {
                                     title: recipe.title,
                                     cookTime: recipe.cookTime,
                                     imageURL: recipe.imageURL,
+                                    isPublic: recipe.isPublic,
+                                    authorId: recipe.authorId,
                                     isFavorite: viewModel.favorites.contains(recipe.id)
                                 ))
                                 .padding(8)
@@ -197,6 +199,8 @@ struct RecipeListView: View {
                                     title: recipe.title,
                                     cookTime: recipe.cookTime,
                                     imageURL: recipe.imageURL,
+                                    isPublic: recipe.isPublic,
+                                    authorId: recipe.authorId,
                                     isFavorite: viewModel.favorites.contains(recipe.id)
                                 ))
                                 .padding(8)
@@ -239,7 +243,7 @@ struct RecipeListView: View {
                 }
             }
             .task { await viewModel.refresh(currentUserId: auth.currentUser?.id) }
-            .onChange(of: auth.currentUser?.id) { _ in
+            .onChange(of: auth.currentUser?.id) { _, _ in
                 Task { await viewModel.refresh(currentUserId: auth.currentUser?.id) }
             }
         }
@@ -254,7 +258,7 @@ struct RecipeListView: View {
             imageURL: recipe.imageURL,
             ingredients: recipe.ingredients,
             isPublic: recipe.isPublic,
-            authorId: recipe.authorId,
+            userId: recipe.authorId,
             steps: [] // możesz doładować w szczegółach jeśli chcesz
         ))
     }

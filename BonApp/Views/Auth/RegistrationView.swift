@@ -4,6 +4,11 @@ struct RegistrationView: View {
     @EnvironmentObject var auth: AuthViewModel
     @Environment(\.dismiss) private var dismiss
 
+    @State private var username: String = ""
+    @State private var firstName: String = ""
+    @State private var lastName: String = ""
+    @State private var preferences: String = ""
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -14,7 +19,8 @@ struct RegistrationView: View {
 
                     TextField("E-mail", text: $auth.email)
                         .keyboardType(.emailAddress)
-                        .autocapitalization(.none)
+                        .textContentType(.emailAddress)
+                        .textInputAutocapitalization(.never)
                         .foregroundColor(Color("textPrimary"))
                         .padding(16)
                         .background(Color("textfieldBackground"))
@@ -33,8 +39,10 @@ struct RegistrationView: View {
                                 .stroke(Color("textfieldBorder"), lineWidth: 1)
                         )
                         .cornerRadius(8)
+                        .textContentType(.newPassword)
 
-                    TextField("Imię", text: $auth.name)
+                    TextField("Nazwa użytkownika (opcjonalnie)", text: $username)
+                        .textInputAutocapitalization(.never)
                         .foregroundColor(Color("textPrimary"))
                         .padding(16)
                         .background(Color("textfieldBackground"))
@@ -44,7 +52,29 @@ struct RegistrationView: View {
                         )
                         .cornerRadius(8)
 
-                    TextField("Preferencje kulinarne", text: $auth.preferences)
+                    TextField("Imię", text: $firstName)
+                        .foregroundColor(Color("textPrimary"))
+                        .padding(16)
+                        .background(Color("textfieldBackground"))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color("textfieldBorder"), lineWidth: 1)
+                        )
+                        .cornerRadius(8)
+                        .textContentType(.givenName)
+
+                    TextField("Nazwisko (opcjonalnie)", text: $lastName)
+                        .foregroundColor(Color("textPrimary"))
+                        .padding(16)
+                        .background(Color("textfieldBackground"))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color("textfieldBorder"), lineWidth: 1)
+                        )
+                        .cornerRadius(8)
+                        .textContentType(.familyName)
+
+                    TextField("Preferencje kulinarne (opcjonalnie)", text: $preferences)
                         .foregroundColor(Color("textPrimary"))
                         .padding(16)
                         .background(Color("textfieldBackground"))
@@ -60,12 +90,21 @@ struct RegistrationView: View {
                     }
 
                     Button("Zarejestruj") {
-                        auth.register()
+                        Task {
+                            await auth.register(
+                                email: auth.email,
+                                password: auth.password,
+                                username: username.isEmpty ? nil : username,
+                                firstName: firstName,
+                                lastName: lastName.isEmpty ? nil : lastName,
+                                preferences: preferences.isEmpty ? nil : preferences
+                            )
+                        }
                     }
                     .disabled(
                         !Validators.isValidEmail(auth.email) ||
                         !Validators.isValidPassword(auth.password) ||
-                        auth.name.trimmingCharacters(in: .whitespaces).isEmpty
+                        firstName.trimmingCharacters(in: .whitespaces).isEmpty
                     )
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .background(Color("register"))
@@ -77,10 +116,8 @@ struct RegistrationView: View {
             .background(Color("background").ignoresSafeArea())
             .navigationTitle("Rejestracja")
             .navigationBarTitleDisplayMode(.inline)
-            .onChange(of: auth.isAuthenticated) { oldValue, newValue in
-                if newValue {
-                    dismiss()
-                }
+            .onChange(of: auth.isAuthenticated) { _, newValue in
+                if newValue { dismiss() }
             }
         }
     }

@@ -3,14 +3,31 @@ import Supabase
 
 struct PantryItemDTO: Identifiable, Hashable, Decodable {
     let id: UUID
-    let name: String
-    let quantity: String
-    let category: String?
-    let ownerId: String
+    let quantity: Double
+    let userId: String
+    let productId: Int
+    let productName: String
+    let productCategoryId: Int?
 
-    enum CodingKeys: String, CodingKey {
-        case id, name, quantity, category
-        case ownerId = "owner_id"
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case quantity
+        case userId = "user_id"
+        case productId = "product_id"
+        case product
+    }
+
+    private struct ProductEmbed: Decodable { let id: Int; let name: String; let product_category_id: Int? }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        quantity = try c.decode(Double.self, forKey: .quantity)
+        userId = try c.decode(String.self, forKey: .userId)
+        productId = try c.decode(Int.self, forKey: .productId)
+        let p = try c.decode(ProductEmbed.self, forKey: .product)
+        productName = p.name
+        productCategoryId = p.product_category_id
     }
 }
 
@@ -37,10 +54,9 @@ final class PantryViewModel: ObservableObject {
         do {
             let rows: [PantryItemDTO] = try await client.database
                 .from("pantry")
-                .select("id,name,quantity,category,owner_id")
-                .eq("owner_id", value: userId)
-                .order("category", ascending: true)
-                .order("name", ascending: true)
+                .select("id,quantity,user_id,product_id,product:product_id(id,name,product_category_id)")
+                .eq("user_id", value: userId)
+                .order("id", ascending: true)
                 .execute()
                 .value
             self.pantryItems = rows
@@ -51,13 +67,9 @@ final class PantryViewModel: ObservableObject {
     }
 
     // MARK: - Add
-    func addItem(name: String, quantity: String, category: String?) async {
-        let payload: [String: AnyJSON] = [
-            "name": .string(name),
-            "quantity": .string(quantity),
-            "category": (category != nil ? .string(category!) : .null),
-            "owner_id": .string(userId)
-        ]
+    func addItem(productId: Int, quantity: Double) async {
+        struct InsertPayload: Encodable { let user_id: String; let product_id: Int; let quantity: Double }
+        let payload = InsertPayload(user_id: userId, product_id: productId, quantity: quantity)
         do {
             _ = try await client.database.from("pantry").insert(payload).execute()
             await fetchPantryItems()
@@ -67,18 +79,15 @@ final class PantryViewModel: ObservableObject {
     }
 
     // MARK: - Update
-    func updateItem(id: UUID, name: String, quantity: String, category: String?) async {
-        let payload: [String: AnyJSON] = [
-            "name": .string(name),
-            "quantity": .string(quantity),
-            "category": (category != nil ? .string(category!) : .null)
-        ]
+    func updateItem(id: UUID, productId: Int, quantity: Double) async {
+        struct UpdatePayload: Encodable { let product_id: Int; let quantity: Double }
+        let payload = UpdatePayload(product_id: productId, quantity: quantity)
         do {
             _ = try await client.database
                 .from("pantry")
                 .update(payload)
                 .eq("id", value: id)
-                .eq("owner_id", value: userId)
+                .eq("user_id", value: userId)
                 .execute()
             await fetchPantryItems()
         } catch {
@@ -93,7 +102,7 @@ final class PantryViewModel: ObservableObject {
                 .from("pantry")
                 .delete()
                 .eq("id", value: id)
-                .eq("owner_id", value: userId)
+                .eq("user_id", value: userId)
                 .execute()
             await fetchPantryItems()
         } catch {

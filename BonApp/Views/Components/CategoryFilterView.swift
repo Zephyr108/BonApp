@@ -90,15 +90,15 @@ struct CategoryFilterView: View {
         defer { isLoading = false }
 
         do {
-            // Try dedicated categories table first
-            let names1: [String] = try await fetchCategoryNames(fromTable: "categories", column: "name")
+            // Try dedicated product_category table first
+            let names1: [String] = try await fetchCategoryNamesFromCategoryTable()
             if !names1.isEmpty {
                 categories = uniqueSorted(names1)
                 return
             }
 
-            // Fallback: distinct categories from products table (adjust table/column names to your schema)
-            let names2: [String] = try await fetchCategoryNames(fromTable: "products", column: "category")
+            // Fallback: read via products join (product_category_id)
+            let names2: [String] = try await fetchCategoryNamesFromProductsJoin()
             categories = uniqueSorted(names2)
         } catch {
             errorMessage = error.localizedDescription
@@ -113,18 +113,31 @@ struct CategoryFilterView: View {
 // MARK: - Supabase helpers
 import Supabase
 
-private struct CategoryRow: Decodable { let name: String?; let category: String? }
+private struct CategoryNameRow: Decodable { let name: String }
+private struct ProductCategoryEmbed: Decodable { let name: String }
+private struct ProductWithCategoryRow: Decodable { let product_category: ProductCategoryEmbed? }
 
 private extension CategoryFilterView {
-    func fetchCategoryNames(fromTable table: String, column: String) async throws -> [String] {
+    /// Reads names from the dedicated product_category table.
+    func fetchCategoryNamesFromCategoryTable() async throws -> [String] {
         let client = SupabaseManager.shared.client
-        // Select only the desired column; decode into CategoryRow and map
-        let rows: [CategoryRow] = try await client.database
-            .from(table)
-            .select(column)
+        let rows: [CategoryNameRow] = try await client.database
+            .from("product_category")
+            .select("name")
             .execute()
             .value
-        return rows.compactMap { column == "name" ? $0.name : $0.category }
+        return rows.map { $0.name }
+    }
+
+    /// Fallback: reads names by joining products -> product_category via product_category_id
+    func fetchCategoryNamesFromProductsJoin() async throws -> [String] {
+        let client = SupabaseManager.shared.client
+        let rows: [ProductWithCategoryRow] = try await client.database
+            .from("products")
+            .select("product_category:product_category_id(name)")
+            .execute()
+            .value
+        return rows.compactMap { $0.product_category?.name }
     }
 }
 

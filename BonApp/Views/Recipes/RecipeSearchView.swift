@@ -9,7 +9,7 @@ struct SearchRecipeItem: Identifiable, Hashable, Decodable {
     let cookTime: Int
     let imageURL: String?
     let isPublic: Bool
-    let authorId: String
+    let userId: String
     let ingredients: [String]
 
     enum CodingKeys: String, CodingKey {
@@ -17,7 +17,7 @@ struct SearchRecipeItem: Identifiable, Hashable, Decodable {
         case cookTime = "cook_time"
         case imageURL = "image_url"
         case isPublic = "is_public"
-        case authorId = "author_id"
+        case userId = "user_id"
     }
 }
 
@@ -54,7 +54,7 @@ final class RecipeSearchViewModel: ObservableObject {
 
             var rq = client.database
                 .from("recipes")
-                .select("id,title,detail,cook_time,image_url,is_public,author_id,ingredients")
+                .select("id,title,detail,cook_time,image_url,is_public,user_id,ingredients")
 
             // Apply filters first (on PostgrestFilterBuilder)
             rq = rq.lte("cook_time", value: maxCookTime)
@@ -73,7 +73,7 @@ final class RecipeSearchViewModel: ObservableObject {
 
             if let uid = currentUserId {
                 // Only show my recipes or public ones by others
-                self.results = rows.filter { $0.authorId == uid || $0.isPublic }
+                self.results = rows.filter { $0.userId == uid || $0.isPublic }
             } else {
                 self.results = rows.filter { $0.isPublic }
             }
@@ -133,6 +133,8 @@ struct RecipeSearchView: View {
                                 title: recipe.title,
                                 cookTime: recipe.cookTime,
                                 imageURL: recipe.imageURL,
+                                isPublic: recipe.isPublic,
+                                authorId: recipe.userId,
                                 isFavorite: viewModel.favorites.contains(recipe.id)
                             ))
                             .padding(8)
@@ -152,10 +154,10 @@ struct RecipeSearchView: View {
             .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Szukaj przepisów")
             .navigationTitle("Wyszukaj")
             .task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, currentUserId: auth.currentUser?.id) }
-            .onChange(of: searchText) { _ in Task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, currentUserId: auth.currentUser?.id) } }
-            .onChange(of: maxCookTime) { _ in Task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, currentUserId: auth.currentUser?.id) } }
-            .onChange(of: showOnlyFavorites) { _ in Task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, currentUserId: auth.currentUser?.id) } }
-            .onChange(of: auth.currentUser?.id) { _ in Task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, currentUserId: auth.currentUser?.id) } }
+            .onChange(of: searchText) { _, _ in Task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, currentUserId: auth.currentUser?.id) } }
+            .onChange(of: maxCookTime) { _, _ in Task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, currentUserId: auth.currentUser?.id) } }
+            .onChange(of: showOnlyFavorites) { _, _ in Task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, currentUserId: auth.currentUser?.id) } }
+            .onChange(of: auth.currentUser?.id) { _, _ in Task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, currentUserId: auth.currentUser?.id) } }
         }
     }
 
@@ -168,7 +170,7 @@ struct RecipeSearchView: View {
             imageURL: recipe.imageURL,
             ingredients: recipe.ingredients,
             isPublic: recipe.isPublic,
-            authorId: recipe.authorId,
+            userId: recipe.userId,
             steps: []
         ))
     }

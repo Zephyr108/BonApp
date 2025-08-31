@@ -16,7 +16,7 @@ private struct RecipeInsertPayload: Encodable {
     let is_public: Bool
     let cook_time: Int
     let image_url: String?
-    let author_id: String
+    let user_id: String
     let ingredients: [String]
 }
 
@@ -240,7 +240,7 @@ struct AddRecipeView: View {
                 is_public: isPublic,
                 cook_time: cookTimeInt,
                 image_url: imageURL,
-                author_id: userId,
+                user_id: userId,
                 ingredients: ingredientsArray
             )
 

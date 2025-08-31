@@ -18,6 +18,32 @@ struct AppUser: Equatable {
     var avatarColorHex: String?
 }
 
+private struct DBUserRow: Decodable {
+    let id: String
+    let email: String
+    let username: String?
+    let first_name: String
+    let last_name: String?
+    let preferences: String?
+}
+
+private struct DBUserInsert: Encodable {
+    let id: String
+    let email: String
+    let username: String?
+    let first_name: String
+    let last_name: String?
+    let preferences: String?
+}
+
+private struct DBUserUpdate: Encodable {
+    let email: String
+    let username: String?
+    let first_name: String
+    let last_name: String?
+    let preferences: String?
+}
+
 // MARK: - Supabase client access
 // Provide your own singleton/DI. Ensure you have Supabase Swift SDK installed.
 // Example:
@@ -52,7 +78,7 @@ final class AuthViewModel: ObservableObject {
         Task { await refreshAuthState() }
     }
 
-    // MARK: - Registration (sign up)
+    // MARK: - Registration (legacy, uses metadata)
     func register() {
         errorMessage = nil
 
@@ -96,6 +122,51 @@ final class AuthViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Registration (users table aware)
+    @MainActor
+    func register(email: String,
+                  password: String,
+                  username: String?,
+                  firstName: String,
+                  lastName: String?,
+                  preferences: String?) async {
+        errorMessage = nil
+
+        guard Validators.isValidEmail(email) else { errorMessage = "InvalidEmail"; return }
+        guard Validators.isValidPassword(password) else { errorMessage = "WeakPassword"; return }
+        guard Validators.isNonEmpty(firstName) else { errorMessage = "Name cannot be empty"; return }
+
+        do {
+            // 1) Sign up in Supabase Auth
+            _ = try await client.auth.signUp(
+                email: email,
+                password: password
+            )
+
+            // 2) Insert a row into public.users (FK id = auth.users.id)
+            if let authUser = try? await client.auth.user() {
+                let insert = DBUserInsert(
+                    id: authUser.id.uuidString,
+                    email: email,
+                    username: username,
+                    first_name: firstName,
+                    last_name: lastName,
+                    preferences: preferences
+                )
+                _ = try await client.database
+                    .from("users")
+                    .insert(insert)
+                    .execute()
+            }
+
+            // 3) Refresh local state
+            await refreshAuthState()
+            self.email = ""; self.password = ""; self.name = ""; self.preferences = ""
+        } catch {
+            self.errorMessage = "Registration failed: \(error.localizedDescription)"
+        }
+    }
+
     // MARK: - Update profile (user metadata, email, password)
     func updateProfile(name: String, preferences: String, avatarColorHex: String, email: String, password: String) {
         guard currentUser != nil else {
@@ -117,21 +188,36 @@ final class AuthViewModel: ObservableObject {
 
         Task { @MainActor in
             do {
-                let metadata: [String: AnyJSON] = [
-                    "name": .string(name),
-                    "preferences": preferences.isEmpty ? .null : .string(preferences),
-                    "avatarColorHex": .string(avatarColorHex)
-                ]
+                // Split display name into first/last
+                let parts = name.split(separator: " ")
+                let first = parts.first.map(String.init) ?? name
+                let last = parts.dropFirst().joined(separator: " ")
+                let lastOrNil = last.isEmpty ? nil : last
 
+                // Update Auth user (email/password)
                 try await client.auth.update(
                     user: UserAttributes(
                         email: email,
-                        password: password,
-                        data: metadata
+                        password: password
                     )
                 )
 
-                // Re-read user and publish
+                // Update public.users row
+                if let authUser = try? await client.auth.user() {
+                    let update = DBUserUpdate(
+                        email: email,
+                        username: nil, // leave unchanged from this screen
+                        first_name: first,
+                        last_name: lastOrNil,
+                        preferences: preferences.isEmpty ? nil : preferences
+                    )
+                    _ = try await client.database
+                        .from("users")
+                        .update(update)
+                        .eq("id", value: authUser.id.uuidString)
+                        .execute()
+                }
+
                 await refreshAuthState()
             } catch {
                 self.errorMessage = "Failed to save profile: \(error.localizedDescription)"
@@ -201,25 +287,41 @@ final class AuthViewModel: ObservableObject {
     @MainActor
     private func refreshAuthState() async {
         do {
-            // If a session exists, user is considered authenticated
             let session = try await client.auth.session
             self.isAuthenticated = (session != nil)
 
-            if let user = try? await client.auth.user() {
-                let meta = (user.userMetadata as? [String: Any]) ?? [:]
-                let appUser = AppUser(
-                    id: user.id.uuidString,
-                    email: user.email ?? "",
-                    name: meta["name"] as? String,
-                    preferences: meta["preferences"] as? String,
-                    avatarColorHex: meta["avatarColorHex"] as? String
-                )
-                self.currentUser = appUser
+            if let authUser = try? await client.auth.user() {
+                // fetch row from public.users
+                let rows: [DBUserRow] = try await client.database
+                    .from("users")
+                    .select("id,email,username,first_name,last_name,preferences")
+                    .eq("id", value: authUser.id.uuidString)
+                    .limit(1)
+                    .execute()
+                    .value
+                if let row = rows.first {
+                    let displayName = [row.first_name, row.last_name ?? ""].joined(separator: " ").trimmingCharacters(in: .whitespaces)
+                    self.currentUser = AppUser(
+                        id: row.id,
+                        email: row.email,
+                        name: displayName.isEmpty ? row.first_name : displayName,
+                        preferences: row.preferences,
+                        avatarColorHex: nil
+                    )
+                } else {
+                    // No row in users yet — fall back to auth email
+                    self.currentUser = AppUser(
+                        id: authUser.id.uuidString,
+                        email: authUser.email ?? "",
+                        name: nil,
+                        preferences: nil,
+                        avatarColorHex: nil
+                    )
+                }
             } else {
                 self.currentUser = nil
             }
         } catch {
-            // If reading session/user fails, assume logged out
             self.isAuthenticated = false
             self.currentUser = nil
         }

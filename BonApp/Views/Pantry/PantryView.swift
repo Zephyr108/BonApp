@@ -4,9 +4,29 @@ import Supabase
 // MARK: - DTO from Supabase
 struct PantryItemRow: Identifiable, Decodable, Hashable {
     let id: UUID
-    let name: String
-    let quantity: String
-    let category: String?
+    let productId: Int
+    let productName: String
+    let quantity: Double
+    let productCategoryId: Int?
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case productId = "product_id"
+        case quantity
+        case product
+    }
+
+    private struct ProductEmbed: Decodable { let id: Int; let name: String; let product_category_id: Int? }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        productId = try c.decode(Int.self, forKey: .productId)
+        quantity = try c.decode(Double.self, forKey: .quantity)
+        let p = try c.decode(ProductEmbed.self, forKey: .product)
+        productName = p.name
+        productCategoryId = p.product_category_id
+    }
 }
 
 // MARK: - ViewModel
@@ -16,6 +36,8 @@ final class PantryScreenViewModel: ObservableObject {
     @Published var error: String? = nil
 
     private let client = SupabaseManager.shared.client
+    private var userId: String? = nil
+    func setUserId(_ id: String?) { self.userId = id }
 
     @MainActor
     func refresh() async {
@@ -24,10 +46,12 @@ final class PantryScreenViewModel: ObservableObject {
         error = nil
         defer { isLoading = false }
         do {
+            guard let uid = userId, !uid.isEmpty else { self.pantryItems = []; return }
             let rows: [PantryItemRow] = try await client.database
                 .from("pantry")
-                .select("id,name,quantity,category")
-                .order("name", ascending: true)
+                .select("id,product_id,quantity,product:product_id(id,name,product_category_id)")
+                .eq("user_id", value: uid)
+                .order("id", ascending: true)
                 .execute()
                 .value
             self.pantryItems = rows
@@ -42,6 +66,7 @@ final class PantryScreenViewModel: ObservableObject {
                 .from("pantry")
                 .delete()
                 .eq("id", value: item.id)
+                .eq("user_id", value: userId ?? "")
                 .execute()
             await refresh()
         } catch {
@@ -57,6 +82,7 @@ final class PantryScreenViewModel: ObservableObject {
                 .from("pantry")
                 .delete()
                 .in("id", values: Array(ids))
+                .eq("user_id", value: userId ?? "")
                 .execute()
             await refresh()
         } catch {
@@ -67,6 +93,7 @@ final class PantryScreenViewModel: ObservableObject {
 
 // MARK: - View
 struct PantryView: View {
+    @EnvironmentObject var auth: AuthViewModel
     @StateObject private var viewModel = PantryScreenViewModel()
     @State private var isShowingAdd = false
     @State private var selectedIds: Set<UUID> = []
@@ -98,10 +125,10 @@ struct PantryView: View {
                         ForEach(viewModel.pantryItems) { item in
                             HStack {
                                 VStack(alignment: .leading) {
-                                    Text(item.name)
+                                    Text(item.productName)
                                         .font(.headline)
                                         .foregroundColor(Color("textPrimary"))
-                                    Text(item.quantity)
+                                    Text(String(format: "%.2f", item.quantity))
                                         .font(.subheadline)
                                         .foregroundColor(Color("textSecondary"))
                                 }
@@ -140,7 +167,14 @@ struct PantryView: View {
                 .scrollContentBackground(.hidden)
                 .background(Color("background"))
             }
-            .task { await viewModel.refresh() }
+            .task {
+                viewModel.setUserId(auth.currentUser?.id)
+                await viewModel.refresh()
+            }
+            .onChange(of: auth.currentUser?.id) { _, _ in
+                viewModel.setUserId(auth.currentUser?.id)
+                Task { await viewModel.refresh() }
+            }
             .onChange(of: isShowingAdd) { new in
                 if new == false { Task { await viewModel.refresh() } }
             }

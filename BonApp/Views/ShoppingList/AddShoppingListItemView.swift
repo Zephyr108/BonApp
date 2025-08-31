@@ -1,12 +1,13 @@
 import SwiftUI
 
 struct AddShoppingListItemView: View {
-    @State private var name: String = ""
+    @State private var selectedProductId: Int? = nil
     @State private var quantity: String = ""
-    @State private var category: String = ""
+    @State private var products: [ProductRow] = []
+    @EnvironmentObject var auth: AuthViewModel
     @Environment(\.dismiss) private var dismiss
 
-    let onSave: (_ name: String, _ quantity: String, _ category: String) -> Void
+    let onSave: (_ productId: Int, _ quantity: Double) -> Void
 
     var body: some View {
         NavigationStack {
@@ -19,16 +20,15 @@ struct AddShoppingListItemView: View {
                         .foregroundColor(Color("textPrimary"))
                         .padding(.top, 16)
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Nazwa produktu")
+                        Text("Produkt")
                             .foregroundColor(Color("textPrimary"))
-                        TextField("Nazwa", text: $name)
-                            .padding(16)
-                            .background(Color("textfieldBackground"))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(Color("textfieldBorder"), lineWidth: 1)
-                            )
-                            .cornerRadius(8)
+                        Picker("Wybierz produkt", selection: $selectedProductId) {
+                            ForEach(products) { product in
+                                Text(product.name).tag(Optional(product.id))
+                            }
+                        }
+                        .pickerStyle(MenuPickerStyle())
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Ilość")
@@ -43,21 +43,22 @@ struct AddShoppingListItemView: View {
                             )
                             .cornerRadius(8)
                     }
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Kategoria")
-                            .foregroundColor(Color("textPrimary"))
-                        TextField("Kategoria", text: $category)
-                            .padding(16)
-                            .background(Color("textfieldBackground"))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(Color("textfieldBorder"), lineWidth: 1)
-                            )
-                            .cornerRadius(8)
-                    }
                     Spacer()
                 }
                 .padding(.horizontal, 16)
+                .task {
+                    do {
+                        let rows: [ProductRow] = try await SupabaseManager.shared.client.database
+                            .from("products")
+                            .select("id,name,product_category_id")
+                            .order("name")
+                            .execute()
+                            .value
+                        self.products = rows
+                    } catch {
+                        print("Failed to load products: \(error.localizedDescription)")
+                    }
+                }
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -68,15 +69,14 @@ struct AddShoppingListItemView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Dodaj") {
-                        onSave(
-                            name.trimmingCharacters(in: .whitespacesAndNewlines),
-                            quantity.trimmingCharacters(in: .whitespacesAndNewlines),
-                            category.trimmingCharacters(in: .whitespacesAndNewlines)
-                        )
+                        if let pid = selectedProductId {
+                            let qty = Double(quantity.replacingOccurrences(of: ",", with: ".")) ?? 1.0
+                            onSave(pid, qty)
+                        }
                         dismiss()
                     }
                     .disabled(
-                        name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                        selectedProductId == nil ||
                         quantity.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                     )
                     .foregroundColor(Color("textPrimary"))
@@ -86,9 +86,15 @@ struct AddShoppingListItemView: View {
     }
 }
 
+private struct ProductRow: Decodable, Identifiable {
+    let id: Int
+    let name: String
+    let product_category_id: Int?
+}
+
 struct AddShoppingListItemView_Previews: PreviewProvider {
     static var previews: some View {
-        AddShoppingListItemView { name, quantity, category in
+        AddShoppingListItemView { productId, quantity in
         }
     }
 }

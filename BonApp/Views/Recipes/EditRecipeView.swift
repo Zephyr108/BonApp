@@ -321,6 +321,7 @@ struct EditRecipeView: View {
                 .from("recipes")
                 .update(updatePayload)
                 .eq("id", value: recipeId)
+                .eq("user_id", value: auth.currentUser?.id ?? "")
                 .execute()
 
             // 2) Replace steps: delete existing, insert new
