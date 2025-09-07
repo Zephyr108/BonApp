@@ -43,7 +43,7 @@ final class RecipeListViewModel: ObservableObject {
         defer { isLoading = false }
         do {
             let rows: [RecipeListItem] = try await client.database
-                .from("recipes")
+                .from("recipe")
                 .select("id,title,detail,cook_time,image_url,is_public,user_id,ingredients")
                 .order("title", ascending: true)
                 .execute()
@@ -56,7 +56,7 @@ final class RecipeListViewModel: ObservableObject {
                 // Load favorites for user
                 struct FavRow: Decodable { let recipe_id: UUID }
                 let favRows: [FavRow] = try await client.database
-                    .from("favorites")
+                    .from("favorite_recipe")
                     .select("recipe_id")
                     .eq("user_id", value: uid)
                     .execute()
@@ -75,7 +75,7 @@ final class RecipeListViewModel: ObservableObject {
     func deleteRecipe(_ id: UUID) async {
         do {
             _ = try await client.database
-                .from("recipes")
+                .from("recipe")
                 .delete()
                 .eq("id", value: id)
                 .execute()
@@ -95,7 +95,7 @@ final class RecipeListViewModel: ObservableObject {
             // remove
             do {
                 _ = try await client.database
-                    .from("favorites")
+                    .from("favorite_recipe")
                     .delete()
                     .eq("user_id", value: userId)
                     .eq("recipe_id", value: recipeId)
@@ -109,7 +109,7 @@ final class RecipeListViewModel: ObservableObject {
             do {
                 let payload = FavoriteInsert(user_id: userId, recipe_id: recipeId)
                 _ = try await client.database
-                    .from("favorites")
+                    .from("favorite_recipe")
                     .insert(payload)
                     .execute()
                 await MainActor.run { self.favorites.insert(recipeId) }

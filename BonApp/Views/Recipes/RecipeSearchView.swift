@@ -41,7 +41,7 @@ final class RecipeSearchViewModel: ObservableObject {
             if let uid = currentUserId {
                 struct FavRow: Decodable { let recipe_id: UUID }
                 let favRows: [FavRow] = try await client.database
-                    .from("favorites")
+                    .from("favorite_recipe")
                     .select("recipe_id")
                     .eq("user_id", value: uid)
                     .execute()
@@ -53,7 +53,7 @@ final class RecipeSearchViewModel: ObservableObject {
             }
 
             var rq = client.database
-                .from("recipes")
+                .from("recipe")
                 .select("id,title,detail,cook_time,image_url,is_public,user_id,ingredients")
 
             // Apply filters first (on PostgrestFilterBuilder)

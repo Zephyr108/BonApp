@@ -245,7 +245,7 @@ struct AddRecipeView: View {
             )
 
             _ = try await client.database
-                .from("recipes")
+                .from("recipe")
                 .insert(recipeInsert)
                 .execute()
 

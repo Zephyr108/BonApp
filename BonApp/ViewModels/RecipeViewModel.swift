@@ -5,19 +5,14 @@ import Supabase
 struct RecipeDTO: Identifiable, Hashable, Decodable {
     let id: UUID
     let title: String
-    let detail: String?
-    let ingredients: [String]
-    let cookTime: Int
-    let imageURL: String?
-    let isPublic: Bool
-    let authorId: String
+    let description: String?
+    let prepare_time: Int
+    let photo: String?
+    let visibility: Bool
+    let user_id: String
 
     enum CodingKeys: String, CodingKey {
-        case id, title, detail, ingredients
-        case cookTime = "cook_time"
-        case imageURL = "image_url"
-        case isPublic = "is_public"
-        case authorId = "user_id"
+        case id, title, description, prepare_time, photo, visibility, user_id
     }
 }
 
@@ -36,21 +31,18 @@ struct RecipeStepDTO: Identifiable, Hashable, Decodable {
 private struct RecipeInsert: Encodable {
     let id: UUID
     let title: String
-    let detail: String
-    let ingredients: [String]
-    let cook_time: Int
-    let image_url: String?
-    let is_public: Bool
+    let description: String
+    let prepare_time: Int
+    let photo: String?
+    let visibility: Bool
     let user_id: String
 }
 
 private struct RecipeUpdate: Encodable {
-    let title: String
-    let detail: String
-    let ingredients: [String]
-    let cook_time: Int
-    let image_url: String?
-    let is_public: Bool
+    let description: String
+    let prepare_time: Int
+    let photo: String?
+    let visibility: Bool
 }
 
 private struct StepInsert: Encodable {
@@ -82,18 +74,18 @@ final class RecipeViewModel: ObservableObject {
         defer { isLoading = false }
         do {
             let rows: [RecipeDTO] = try await client.database
-                .from("recipes")
-                .select("id,title,detail,ingredients,cook_time,image_url,is_public,user_id")
+                .from("recipe")
+                .select("id,title,description,prepare_time,photo,visibility,user_id")
                 .order("title", ascending: true)
                 .execute()
                 .value
 
             if let uid = currentUserId {
                 // Pokaż moje + publiczne innych
-                self.recipes = rows.filter { $0.authorId == uid || $0.isPublic }
+                self.recipes = rows.filter { $0.user_id == uid || $0.visibility }
             } else {
                 // U niezalogowanych pokazujemy tylko publiczne
-                self.recipes = rows.filter { $0.isPublic }
+                self.recipes = rows.filter { $0.visibility }
             }
         } catch {
             self.error = error.localizedDescription
@@ -105,38 +97,37 @@ final class RecipeViewModel: ObservableObject {
     /// Tworzy nowy przepis w Supabase. Jeśli podasz `imageData`, zapisze plik w bucketcie `recipes`.
     func addRecipe(
         title: String,
-        detail: String,
-        ingredients: [String],
-        cookTime: Int,
+        description: String,
+        _ ingredients: [String] = [],
+        prepare_time: Int,
         imageData: Data?,
-        isPublic: Bool,
-        authorId: String
+        visibility: Bool,
+        user_id: String
     ) async {
         let recipeId = UUID()
-        var imageURL: String? = nil
+        var photo: String? = nil
         do {
             // 1) Opcjonalny upload zdjęcia
             if let data = imageData {
-                let path = "\(authorId)/recipes/\(recipeId).jpg"
+                let path = "\(user_id)/recipes/\(recipeId).jpg"
                 _ = try await client.storage
                     .from("recipes")
                     .upload(path: path, file: data, options: FileOptions(cacheControl: "3600", contentType: "image/jpeg", upsert: true))
-                imageURL = try client.storage.from("recipes").getPublicURL(path: path).absoluteString
+                photo = try client.storage.from("recipes").getPublicURL(path: path).absoluteString
             }
 
             let payload = RecipeInsert(
                 id: recipeId,
                 title: title,
-                detail: detail,
-                ingredients: ingredients,
-                cook_time: cookTime,
-                image_url: imageURL,
-                is_public: isPublic,
-                user_id: authorId
+                description: description,
+                prepare_time: prepare_time,
+                photo: photo,
+                visibility: visibility,
+                user_id: user_id
             )
 
             _ = try await client.database
-                .from("recipes")
+                .from("recipe")
                 .insert(payload)
                 .execute()
 
@@ -151,34 +142,32 @@ final class RecipeViewModel: ObservableObject {
     func updateRecipe(
         id: UUID,
         title: String,
-        detail: String,
-        ingredients: [String],
-        cookTime: Int,
+        description: String,
+        _ ingredients: [String] = [],
+        prepare_time: Int,
         newImageData: Data?,
-        isPublic: Bool,
-        authorId: String
+        visibility: Bool,
+        user_id: String
     ) async {
         do {
-            var imageURL: String? = nil
+            var photo: String? = nil
             if let data = newImageData {
-                let path = "\(authorId)/recipes/\(id).jpg"
+                let path = "\(user_id)/recipes/\(id).jpg"
                 _ = try await client.storage
                     .from("recipes")
                     .upload(path: path, file: data, options: FileOptions(cacheControl: "3600", contentType: "image/jpeg", upsert: true))
-                imageURL = try client.storage.from("recipes").getPublicURL(path: path).absoluteString
+                photo = try client.storage.from("recipes").getPublicURL(path: path).absoluteString
             }
 
             let updatePayload = RecipeUpdate(
-                title: title,
-                detail: detail,
-                ingredients: ingredients,
-                cook_time: cookTime,
-                image_url: imageURL,
-                is_public: isPublic
+                description: description,
+                prepare_time: prepare_time,
+                photo: photo,
+                visibility: visibility
             )
 
             _ = try await client.database
-                .from("recipes")
+                .from("recipe")
                 .update(updatePayload)
                 .eq("id", value: id)
                 .execute()
@@ -192,15 +181,8 @@ final class RecipeViewModel: ObservableObject {
     // MARK: - Delete
     func deleteRecipe(id: UUID) async {
         do {
-            // Usuń kroki (jeśli nie masz kaskady w DB)
-            _ = try? await client.database
-                .from("recipe_steps")
-                .delete()
-                .eq("recipe_id", value: id)
-                .execute()
-
             _ = try await client.database
-                .from("recipes")
+                .from("recipe")
                 .delete()
                 .eq("id", value: id)
                 .execute()
@@ -215,26 +197,25 @@ final class RecipeViewModel: ObservableObject {
     /// Dodaje krok do przepisu. Ustala `order` jako (max(order) + 1).
     func addStep(_ instruction: String, to recipeId: UUID) async {
         do {
-            struct OrderRow: Decodable { let order: Int }
-            let rows: [OrderRow] = try await client.database
-                .from("recipe_steps")
-                .select("order")
-                .eq("recipe_id", value: recipeId)
-                .order("order", ascending: false)
+            struct StepsRow: Decodable { let steps_list: [String]? }
+            // 1) Load current steps
+            let rows: [StepsRow] = try await client.database
+                .from("recipe")
+                .select("steps_list")
+                .eq("id", value: recipeId)
                 .limit(1)
                 .execute()
                 .value
-            let next = (rows.first?.order ?? 0) + 1
+            var steps = rows.first?.steps_list ?? []
+            steps.append(instruction)
 
-            let payload = StepInsert(
-                id: UUID(),
-                recipe_id: recipeId,
-                order: next,
-                instruction: instruction
-            )
+            struct StepsUpdate: Encodable { let steps_list: [String] }
+            let payload = StepsUpdate(steps_list: steps)
+
             _ = try await client.database
-                .from("recipe_steps")
-                .insert(payload)
+                .from("recipe")
+                .update(payload)
+                .eq("id", value: recipeId)
                 .execute()
         } catch {
             await MainActor.run { self.error = error.localizedDescription }
@@ -245,14 +226,18 @@ final class RecipeViewModel: ObservableObject {
     @MainActor
     func steps(for recipeId: UUID) async -> [RecipeStepDTO] {
         do {
-            let rows: [RecipeStepDTO] = try await client.database
-                .from("recipe_steps")
-                .select("id,recipe_id,order,instruction")
-                .eq("recipe_id", value: recipeId)
-                .order("order", ascending: true)
+            struct StepsRow: Decodable { let steps_list: [String]? }
+            let rows: [StepsRow] = try await client.database
+                .from("recipe")
+                .select("steps_list")
+                .eq("id", value: recipeId)
+                .limit(1)
                 .execute()
                 .value
-            return rows
+            let steps = rows.first?.steps_list ?? []
+            return steps.enumerated().map { idx, text in
+                RecipeStepDTO(id: UUID(), recipeId: recipeId, order: idx + 1, instruction: text)
+            }
         } catch {
             self.error = error.localizedDescription
             return []

@@ -318,7 +318,7 @@ struct EditRecipeView: View {
             )
 
             _ = try await client.database
-                .from("recipes")
+                .from("recipe")
                 .update(updatePayload)
                 .eq("id", value: recipeId)
                 .eq("user_id", value: auth.currentUser?.id ?? "")

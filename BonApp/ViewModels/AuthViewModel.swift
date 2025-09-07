@@ -44,19 +44,6 @@ private struct DBUserUpdate: Encodable {
     let preferences: String?
 }
 
-// MARK: - Supabase client access
-// Provide your own singleton/DI. Ensure you have Supabase Swift SDK installed.
-// Example:
-// let supabase = SupabaseClient(supabaseURL: URL(string: "https://YOUR-PROJECT.supabase.co")!, supabaseKey: "YOUR_ANON_KEY")
-final class SupabaseManager {
-    static let shared = SupabaseManager()
-    // Replace placeholders with your real URL & anon key.
-    let client: SupabaseClient = SupabaseClient(
-        supabaseURL: URL(string: "https://pksuyabrwexreslizpxp.supabase.co")!,
-        supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBrc3V5YWJyd2V4cmVzbGl6cHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwMTI5NjksImV4cCI6MjA3MDU4ODk2OX0.RFeuz5qS7tyOXh1ph3ltBIQDdUt8WFsuLlWO0m7NEB4"
-    )
-}
-
 final class AuthViewModel: ObservableObject {
     // MARK: - Inputs
     @Published var email: String = ""
