@@ -36,27 +36,33 @@ struct LoginView: View {
                         .cornerRadius(8)
 
                     if let errorKey = auth.errorMessage {
-                        Text(LocalizedStringKey(errorKey))
+                        // Show raw error text (not as a localization key) for clearer diagnostics
+                        Text(errorKey)
                             .foregroundColor(Color("logout"))
                     }
 
                     Button("Zaloguj") {
-                        Task { await auth.login() }
+                        Task {
+                            await auth.login()
+                            print("[LoginView] after login: isAuthenticated=\(auth.isAuthenticated), error=\(auth.errorMessage ?? "nil")")
+                            if auth.isAuthenticated { dismiss() }
+                        }
                     }
-                    .disabled(auth.email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || auth.password.isEmpty)
+                    .disabled(auth.email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || auth.password.isEmpty || auth.isLoading)
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .background(Color("login"))
                     .foregroundColor(.white)
                     .cornerRadius(8)
+                    if auth.isLoading {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                    }
                 }
                 .padding()
             }
             .background(Color("background").ignoresSafeArea())
             .navigationTitle("Logowanie")
             .navigationBarTitleDisplayMode(.inline)
-            .onChange(of: auth.isAuthenticated) { _, isAuth in
-                if isAuth { dismiss() }
-            }
         }
     }
 }

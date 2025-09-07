@@ -55,6 +55,7 @@ final class AuthViewModel: ObservableObject {
     @Published var isAuthenticated: Bool = false
     @Published var currentUser: AppUser? = nil
     @Published var errorMessage: String? = nil
+    @Published var isLoading: Bool = false
 
     private let client: SupabaseClient
     private var cancellables = Set<AnyCancellable>()
@@ -235,22 +236,62 @@ final class AuthViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Logout
-    func logout() {
-        Task { @MainActor in
+    // MARK: - Login (async with retry)
+    @MainActor
+    func login() async {
+        isLoading = true
+        defer { isLoading = false }
+        errorMessage = nil
+
+        let emailTrim = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        let pass = password
+
+        var lastError: Error?
+        for attempt in 1...3 {
             do {
-                try await client.auth.signOut()
+                try await signInInternal(email: emailTrim, password: pass)
+                self.isAuthenticated = true
+                // Refresh in background so we don't immediately overwrite the flag if session propagation lags
+                Task { await self.refreshAuthState() }
+                return
             } catch {
-                // Even if signOut throws (network), clear local state
-                print("Sign out error: \(error.localizedDescription)")
+                lastError = error
+                if let urlErr = error as? URLError, urlErr.code == .networkConnectionLost {
+                    try? await Task.sleep(nanoseconds: 700_000_000)
+                    continue
+                }
+                break
             }
-            self.isAuthenticated = false
-            self.currentUser = nil
-            self.email = ""
-            self.password = ""
-            self.name = ""
-            self.preferences = ""
         }
+
+        if let urlErr = lastError as? URLError {
+            self.errorMessage = "Błąd sieci (\(urlErr.code.rawValue)): \(urlErr.localizedDescription)"
+            print("[Auth] URLError:", urlErr)
+        } else {
+            self.errorMessage = lastError?.localizedDescription ?? "Nieznany błąd logowania"
+            print("[Auth] ERROR:", String(describing: lastError))
+        }
+    }
+
+    private func signInInternal(email: String, password: String) async throws {
+        try await SupabaseManager.shared.client.auth.signIn(email: email, password: password)
+    }
+
+    // MARK: - Logout (async)
+    @MainActor
+    func logout() async {
+        do {
+            try await client.auth.signOut()
+        } catch {
+            // Even if signOut throws (network), clear local state
+            print("Sign out error: \(error.localizedDescription)")
+        }
+        self.isAuthenticated = false
+        self.currentUser = nil
+        self.email = ""
+        self.password = ""
+        self.name = ""
+        self.preferences = ""
     }
 
     /// Async sign-out API used by UI (ContentView). Non-throwing.
@@ -272,12 +313,11 @@ final class AuthViewModel: ObservableObject {
 
     // MARK: - Session/User helpers
     @MainActor
-    private func refreshAuthState() async {
+    func refreshAuthState() async {
         do {
-            let session = try await client.auth.session
-            self.isAuthenticated = (session != nil)
-
             if let authUser = try? await client.auth.user() {
+                // We have an authenticated user
+                self.isAuthenticated = true
                 // fetch row from public.users
                 let rows: [DBUserRow] = try await client.database
                     .from("users")
@@ -306,6 +346,7 @@ final class AuthViewModel: ObservableObject {
                     )
                 }
             } else {
+                self.isAuthenticated = false
                 self.currentUser = nil
             }
         } catch {

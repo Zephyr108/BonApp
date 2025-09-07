@@ -33,14 +33,19 @@ struct ContentView: View {
 
     @ViewBuilder
     private var accountContent: some View {
-        if let user = currentUser {
+        if auth.isAuthenticated {
             ZStack {
                 Color("background").ignoresSafeArea()
                 VStack(spacing: 12) {
-                    Text("Zalogowano jako \(user.email)")
-                        .foregroundColor(Color("textPrimary"))
+                    if let user = currentUser {
+                        Text("Zalogowano jako \(user.email)")
+                            .foregroundColor(Color("textPrimary"))
+                    } else {
+                        Text("Zalogowano")
+                            .foregroundColor(Color("textPrimary"))
+                    }
                     Button("Wyloguj") {
-                        Task { await auth.signOut() }
+                        Task { await auth.logout() }
                     }
                     .foregroundColor(Color("buttonText"))
                     .frame(maxWidth: .infinity, minHeight: 44)
