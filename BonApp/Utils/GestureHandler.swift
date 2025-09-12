@@ -56,7 +56,7 @@ struct GestureHandler {
     
     //double-tap
     static func doubleTapGesture(
-        user: User?,
+        user: AppUser?,
         perform: @escaping () -> Void
     ) -> some Gesture {
         TapGesture(count: 2)

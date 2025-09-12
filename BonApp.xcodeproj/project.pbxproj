@@ -36,16 +36,6 @@
 		D3D458D72DBFEB1E001C706B /* BonApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BonApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D3D458E92DBFEB1F001C706B /* BonAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BonAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D3D458F32DBFEB1F001C706B /* BonAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BonAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		D3D459742DBFF35B001C706B /* PantryItem+CoreDataClass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "PantryItem+CoreDataClass.swift"; path = "BonApp/Models/PantryItem+CoreDataClass.swift"; sourceTree = "<group>"; };
-		D3D459752DBFF35B001C706B /* PantryItem+CoreDataProperties.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "PantryItem+CoreDataProperties.swift"; path = "BonApp/Models/PantryItem+CoreDataProperties.swift"; sourceTree = "<group>"; };
-		D3D459762DBFF35B001C706B /* Recipe+CoreDataClass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Recipe+CoreDataClass.swift"; path = "BonApp/Models/Recipe+CoreDataClass.swift"; sourceTree = "<group>"; };
-		D3D459772DBFF35B001C706B /* Recipe+CoreDataProperties.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Recipe+CoreDataProperties.swift"; path = "BonApp/Models/Recipe+CoreDataProperties.swift"; sourceTree = "<group>"; };
-		D3D459782DBFF35B001C706B /* ShoppingListItem+CoreDataClass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "ShoppingListItem+CoreDataClass.swift"; path = "BonApp/Models/ShoppingListItem+CoreDataClass.swift"; sourceTree = "<group>"; };
-		D3D459792DBFF35B001C706B /* ShoppingListItem+CoreDataProperties.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "ShoppingListItem+CoreDataProperties.swift"; path = "BonApp/Models/ShoppingListItem+CoreDataProperties.swift"; sourceTree = "<group>"; };
-		D3D4597A2DBFF35B001C706B /* User+CoreDataClass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "User+CoreDataClass.swift"; path = "BonApp/Models/User+CoreDataClass.swift"; sourceTree = "<group>"; };
-		D3D4597B2DBFF35B001C706B /* User+CoreDataProperties.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "User+CoreDataProperties.swift"; path = "BonApp/Models/User+CoreDataProperties.swift"; sourceTree = "<group>"; };
-		D3E3FCAF2DC21B7900E9066E /* RecipeStep+CoreDataClass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RecipeStep+CoreDataClass.swift"; path = "BonApp/Models/RecipeStep+CoreDataClass.swift"; sourceTree = "<group>"; };
-		D3E3FCB02DC21B7900E9066E /* RecipeStep+CoreDataProperties.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RecipeStep+CoreDataProperties.swift"; path = "BonApp/Models/RecipeStep+CoreDataProperties.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -107,16 +97,6 @@
 		D3D458CE2DBFEB1E001C706B = {
 			isa = PBXGroup;
 			children = (
-				D3E3FCAF2DC21B7900E9066E /* RecipeStep+CoreDataClass.swift */,
-				D3E3FCB02DC21B7900E9066E /* RecipeStep+CoreDataProperties.swift */,
-				D3D459742DBFF35B001C706B /* PantryItem+CoreDataClass.swift */,
-				D3D459752DBFF35B001C706B /* PantryItem+CoreDataProperties.swift */,
-				D3D459762DBFF35B001C706B /* Recipe+CoreDataClass.swift */,
-				D3D459772DBFF35B001C706B /* Recipe+CoreDataProperties.swift */,
-				D3D459782DBFF35B001C706B /* ShoppingListItem+CoreDataClass.swift */,
-				D3D459792DBFF35B001C706B /* ShoppingListItem+CoreDataProperties.swift */,
-				D3D4597A2DBFF35B001C706B /* User+CoreDataClass.swift */,
-				D3D4597B2DBFF35B001C706B /* User+CoreDataProperties.swift */,
 				D3D458D92DBFEB1E001C706B /* BonApp */,
 				D3D458EC2DBFEB1F001C706B /* BonAppTests */,
 				D3D458F62DBFEB1F001C706B /* BonAppUITests */,
