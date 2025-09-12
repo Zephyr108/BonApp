@@ -1,24 +1,34 @@
 import SwiftUI
 
 struct ContentView: View {
+    private enum Tab: Hashable { case recipes, pantry, shopping, account }
+    @State private var selectedTab: Tab = .recipes
     @EnvironmentObject var auth: AuthViewModel
 
     private var currentUser: AppUser? { auth.currentUser }
 
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             RecipeListView()
                 .tabItem { Label("Przepisy", systemImage: "book") }
+                .tag(Tab.recipes)
 
-            if let user = currentUser {
-                PantryView()
-                    .tabItem { Label("Spiżarnia", systemImage: "tray.fill") }
+            if auth.isAuthenticated {
+                if let user = currentUser {
+                    PantryView()
+                        .tabItem { Label("Spiżarnia", systemImage: "tray.fill") }
+                        .tag(Tab.pantry)
 
-                ShoppingListView(ownerId: user.id)
-                    .tabItem { Label("Zakupy", systemImage: "cart.fill") }
+                    ShoppingListView(ownerId: user.id)
+                        .tabItem { Label("Zakupy", systemImage: "cart.fill") }
+                        .tag(Tab.shopping)
+                } else {
+                    ProgressView().tabItem { Label("Spiżarnia", systemImage: "tray.fill") }.tag(Tab.pantry)
+                    ProgressView().tabItem { Label("Zakupy", systemImage: "cart.fill") }.tag(Tab.shopping)
+                }
             } else {
-                EmptyView().tabItem { Label("Spiżarnia", systemImage: "tray.fill") }
-                EmptyView().tabItem { Label("Zakupy", systemImage: "cart.fill") }
+                EmptyView().tabItem { Label("Spiżarnia", systemImage: "tray.fill") }.tag(Tab.pantry)
+                EmptyView().tabItem { Label("Zakupy", systemImage: "cart.fill") }.tag(Tab.shopping)
             }
 
             NavigationStack {
@@ -27,8 +37,12 @@ struct ContentView: View {
             }
             .background(Color("background").ignoresSafeArea())
             .tabItem { Label("Konto", systemImage: "person.crop.circle") }
+            .tag(Tab.account)
         }
         .background(Color("background").ignoresSafeArea())
+        .onChange(of: auth.isAuthenticated) { isAuth in
+            if isAuth { selectedTab = .recipes }
+        }
     }
 
     @ViewBuilder
