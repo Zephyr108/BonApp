@@ -40,7 +40,7 @@ final class RecipeSearchViewModel: ObservableObject {
             var favIds: [UUID] = []
             if let uid = currentUserId {
                 struct FavRow: Decodable { let recipe_id: UUID }
-                let favRows: [FavRow] = try await client.database
+                let favRows: [FavRow] = try await client
                     .from("favorite_recipe")
                     .select("recipe_id")
                     .eq("user_id", value: uid)
@@ -52,7 +52,7 @@ final class RecipeSearchViewModel: ObservableObject {
                 self.favorites = []
             }
 
-            var rq = client.database
+            var rq = client
                 .from("recipe")
                 .select("id,title,detail,cook_time,image_url,is_public,user_id,ingredients")
 
@@ -91,9 +91,6 @@ struct RecipeSearchView: View {
     @State private var maxCookTime: Double = 60
     @State private var showOnlyFavorites: Bool = false
 
-    @State private var selectedId: UUID? = nil
-    @State private var isNavigating = false
-
     var body: some View {
         NavigationStack {
             VStack {
@@ -119,15 +116,7 @@ struct RecipeSearchView: View {
 
                 List {
                     ForEach(viewModel.results) { recipe in
-                        ZStack {
-                            NavigationLink(
-                                destination: destination(for: recipe),
-                                isActive: Binding(
-                                    get: { selectedId == recipe.id && isNavigating },
-                                    set: { newValue in if !newValue { selectedId = nil; isNavigating = false } }
-                                )
-                            ) { EmptyView() }.opacity(0)
-
+                        NavigationLink(value: recipe) {
                             RecipeRowView(recipe: RecipeItem(
                                 id: recipe.id,
                                 title: recipe.title,
@@ -141,7 +130,6 @@ struct RecipeSearchView: View {
                             .background(Color("itemsListBackground"))
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                             .contentShape(Rectangle())
-                            .onTapGesture { selectedId = recipe.id; isNavigating = true }
                         }
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
@@ -153,6 +141,9 @@ struct RecipeSearchView: View {
             .background(Color("background").ignoresSafeArea())
             .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Szukaj przepisów")
             .navigationTitle("Wyszukaj")
+            .navigationDestination(for: SearchRecipeItem.self) { recipe in
+                destination(for: recipe)
+            }
             .task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, currentUserId: auth.currentUser?.id) }
             .onChange(of: searchText) { _, _ in Task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, currentUserId: auth.currentUser?.id) } }
             .onChange(of: maxCookTime) { _, _ in Task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, currentUserId: auth.currentUser?.id) } }

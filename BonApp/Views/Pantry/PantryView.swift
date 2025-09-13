@@ -47,7 +47,7 @@ final class PantryScreenViewModel: ObservableObject {
         defer { isLoading = false }
         do {
             guard let uid = userId, !uid.isEmpty else { self.pantryItems = []; return }
-            let rows: [PantryItemRow] = try await client.database
+            let rows: [PantryItemRow] = try await client
                 .from("pantry")
                 .select("id,product_id,quantity,product:product_id(id,name,product_category_id)")
                 .eq("user_id", value: uid)
@@ -62,7 +62,7 @@ final class PantryScreenViewModel: ObservableObject {
 
     func deleteItem(_ item: PantryItemRow) async {
         do {
-            _ = try await client.database
+            _ = try await client
                 .from("pantry")
                 .delete()
                 .eq("id", value: item.id)
@@ -78,7 +78,7 @@ final class PantryScreenViewModel: ObservableObject {
         guard !ids.isEmpty else { return }
         do {
             // Batch delete with `in` filter
-            _ = try await client.database
+            _ = try await client
                 .from("pantry")
                 .delete()
                 .in("id", values: Array(ids))
@@ -171,11 +171,11 @@ struct PantryView: View {
                 viewModel.setUserId(auth.currentUser?.id)
                 await viewModel.refresh()
             }
-            .onChange(of: auth.currentUser?.id) { _, _ in
-                viewModel.setUserId(auth.currentUser?.id)
+            .onChange(of: auth.currentUser?.id, initial: false) { old, new in
+                viewModel.setUserId(new)
                 Task { await viewModel.refresh() }
             }
-            .onChange(of: isShowingAdd) { new in
+            .onChange(of: isShowingAdd, initial: false) { old, new in
                 if new == false { Task { await viewModel.refresh() } }
             }
             .navigationTitle("Spiżarnia")

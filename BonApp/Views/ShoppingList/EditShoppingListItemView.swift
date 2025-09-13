@@ -78,7 +78,7 @@ struct EditShoppingListItemView: View {
         defer { isLoading = false }
         do {
             // Load products
-            let rows: [ProductRow] = try await SupabaseManager.shared.client.database
+            let rows: [ProductRow] = try await SupabaseManager.shared.client
                 .from("products")
                 .select("id,name,product_category_id")
                 .order("name")
@@ -89,7 +89,7 @@ struct EditShoppingListItemView: View {
             // Load the shopping list item (with embedded product data)
             let client = SupabaseManager.shared.client
             let userId = auth.currentUser?.id ?? ""
-            let query = client.database
+            let query = client
                 .from("shopping_list")
                 .select("product_id,quantity,product:products(id,name,product_category_id)")
                 .eq("id", value: itemId)
@@ -117,7 +117,7 @@ struct EditShoppingListItemView: View {
                 let userId = auth.currentUser?.id ?? ""
                 struct UpdatePayload: Encodable { let product_id: Int; let quantity: Double }
                 let payload = UpdatePayload(product_id: pid, quantity: qty)
-                _ = try await client.database
+                _ = try await client
                     .from("shopping_list")
                     .update(payload)
                     .eq("id", value: itemId)

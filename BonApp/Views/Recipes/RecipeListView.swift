@@ -42,7 +42,7 @@ final class RecipeListViewModel: ObservableObject {
         error = nil
         defer { isLoading = false }
         do {
-            let rows: [RecipeListItem] = try await client.database
+            let rows: [RecipeListItem] = try await client
                 .from("recipe")
                 .select("id,title,detail,cook_time,image_url,is_public,user_id,ingredients")
                 .order("title", ascending: true)
@@ -55,7 +55,7 @@ final class RecipeListViewModel: ObservableObject {
 
                 // Load favorites for user
                 struct FavRow: Decodable { let recipe_id: UUID }
-                let favRows: [FavRow] = try await client.database
+                let favRows: [FavRow] = try await client
                     .from("favorite_recipe")
                     .select("recipe_id")
                     .eq("user_id", value: uid)
@@ -74,13 +74,13 @@ final class RecipeListViewModel: ObservableObject {
 
     func deleteRecipe(_ id: UUID) async {
         do {
-            _ = try await client.database
+            _ = try await client
                 .from("recipe")
                 .delete()
                 .eq("id", value: id)
                 .execute()
             // Also delete related steps (if not cascaded in DB)
-            _ = try? await client.database
+            _ = try? await client
                 .from("recipe_steps")
                 .delete()
                 .eq("recipe_id", value: id)
@@ -94,7 +94,7 @@ final class RecipeListViewModel: ObservableObject {
         if favorites.contains(recipeId) {
             // remove
             do {
-                _ = try await client.database
+                _ = try await client
                     .from("favorite_recipe")
                     .delete()
                     .eq("user_id", value: userId)
@@ -108,7 +108,7 @@ final class RecipeListViewModel: ObservableObject {
             // add
             do {
                 let payload = FavoriteInsert(user_id: userId, recipe_id: recipeId)
-                _ = try await client.database
+                _ = try await client
                     .from("favorite_recipe")
                     .insert(payload)
                     .execute()
@@ -123,9 +123,6 @@ final class RecipeListViewModel: ObservableObject {
 struct RecipeListView: View {
     @EnvironmentObject var auth: AuthViewModel
     @StateObject private var viewModel = RecipeListViewModel()
-
-    @State private var selectedId: UUID? = nil
-    @State private var isNavigating = false
 
     var body: some View {
         NavigationStack {
@@ -145,15 +142,7 @@ struct RecipeListView: View {
 
                     Section(header: Text("Moje przepisy").foregroundColor(Color("textSecondary"))) {
                         ForEach(viewModel.myRecipes) { recipe in
-                            ZStack {
-                                NavigationLink(
-                                    destination: destination(for: recipe),
-                                    isActive: Binding(
-                                        get: { selectedId == recipe.id && isNavigating },
-                                        set: { newValue in if !newValue { selectedId = nil; isNavigating = false } }
-                                    )
-                                ) { EmptyView() }.opacity(0)
-
+                            NavigationLink(value: recipe) {
                                 RecipeRowView(recipe: RecipeItem(
                                     id: recipe.id,
                                     title: recipe.title,
@@ -167,11 +156,10 @@ struct RecipeListView: View {
                                 .background(Color("itemsListBackground"))
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
                                 .contentShape(Rectangle())
-                                .onTapGesture { selectedId = recipe.id; isNavigating = true }
-                                .onTapGesture(count: 2) { toggleFavorite(for: recipe.id) }
                             }
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
+                            .onTapGesture(count: 2) { toggleFavorite(for: recipe.id) }
                             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                 Button(role: .destructive) {
                                     Task {
@@ -185,15 +173,7 @@ struct RecipeListView: View {
 
                     Section(header: Text("Przepisy użytkowników").foregroundColor(Color("textSecondary"))) {
                         ForEach(viewModel.otherRecipes) { recipe in
-                            ZStack {
-                                NavigationLink(
-                                    destination: destination(for: recipe),
-                                    isActive: Binding(
-                                        get: { selectedId == recipe.id && isNavigating },
-                                        set: { newValue in if !newValue { selectedId = nil; isNavigating = false } }
-                                    )
-                                ) { EmptyView() }.opacity(0)
-
+                            NavigationLink(value: recipe) {
                                 RecipeRowView(recipe: RecipeItem(
                                     id: recipe.id,
                                     title: recipe.title,
@@ -207,11 +187,10 @@ struct RecipeListView: View {
                                 .background(Color("itemsListBackground"))
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
                                 .contentShape(Rectangle())
-                                .onTapGesture { selectedId = recipe.id; isNavigating = true }
-                                .onTapGesture(count: 2) { toggleFavorite(for: recipe.id) }
                             }
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
+                            .onTapGesture(count: 2) { toggleFavorite(for: recipe.id) }
                         }
                     }
                 }
@@ -242,8 +221,11 @@ struct RecipeListView: View {
                     }
                 }
             }
+            .navigationDestination(for: RecipeListItem.self) { recipe in
+                destination(for: recipe)
+            }
             .task { await viewModel.refresh(currentUserId: auth.currentUser?.id) }
-            .onChange(of: auth.currentUser?.id) { _, _ in
+            .onChange(of: auth.currentUser?.id, initial: false) { _, _ in
                 Task { await viewModel.refresh(currentUserId: auth.currentUser?.id) }
             }
         }

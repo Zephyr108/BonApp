@@ -121,7 +121,7 @@ private extension CategoryFilterView {
     /// Reads names from the dedicated product_category table.
     func fetchCategoryNamesFromCategoryTable() async throws -> [String] {
         let client = SupabaseManager.shared.client
-        let rows: [CategoryNameRow] = try await client.database
+        let rows: [CategoryNameRow] = try await client
             .from("product_category")
             .select("name")
             .execute()
@@ -132,7 +132,7 @@ private extension CategoryFilterView {
     /// Fallback: reads names by joining products -> product_category via product_category_id
     func fetchCategoryNamesFromProductsJoin() async throws -> [String] {
         let client = SupabaseManager.shared.client
-        let rows: [ProductWithCategoryRow] = try await client.database
+        let rows: [ProductWithCategoryRow] = try await client
             .from("products")
             .select("product_category:product_category_id(name)")
             .execute()

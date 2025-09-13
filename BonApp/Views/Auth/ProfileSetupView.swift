@@ -156,7 +156,7 @@ struct ProfileSetupView: View {
         let trimmedPrefs = preferences.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedPass = password.trimmingCharacters(in: .whitespacesAndNewlines)
-        let hex = avatarColor.toHex() ?? "#000000"
+        let hex = avatarColor.toHex()
 
         auth.updateProfile(
             name: trimmedName,

@@ -40,7 +40,7 @@ struct ContentView: View {
             .tag(Tab.account)
         }
         .background(Color("background").ignoresSafeArea())
-        .onChange(of: auth.isAuthenticated) { isAuth in
+        .onChange(of: auth.isAuthenticated, initial: false) { _, isAuth in
             if isAuth { selectedTab = .recipes }
         }
     }

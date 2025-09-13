@@ -78,7 +78,7 @@ final class ShoppingListViewModel: ObservableObject {
         defer { isLoading = false }
 
         do {
-            let rows: [ShoppingListItemDTO] = try await client.database
+            let rows: [ShoppingListItemDTO] = try await client
                 .from("shopping_list")
                 .select("id,product_id,quantity,is_bought,user_id,product:product_id(id,name,product_category_id)")
                 .eq("user_id", value: userId)
@@ -97,7 +97,7 @@ final class ShoppingListViewModel: ObservableObject {
     func addItem(productId: Int, quantity: Double) async {
         let payload = ShoppingInsert(user_id: userId, product_id: productId, quantity: quantity, is_bought: false)
         do {
-            _ = try await client.database.from("shopping_list").insert(payload).execute()
+            _ = try await client.from("shopping_list").insert(payload).execute()
             await fetchItems()
         } catch {
             await MainActor.run { self.error = error.localizedDescription }
@@ -108,7 +108,7 @@ final class ShoppingListViewModel: ObservableObject {
     func updateItem(id: UUID, productId: Int, quantity: Double) async {
         let payload = ShoppingUpdate(product_id: productId, quantity: quantity)
         do {
-            _ = try await client.database
+            _ = try await client
                 .from("shopping_list")
                 .update(payload)
                 .eq("id", value: id)
@@ -123,7 +123,7 @@ final class ShoppingListViewModel: ObservableObject {
     // MARK: - Delete
     func deleteItem(id: UUID) async {
         do {
-            _ = try await client.database
+            _ = try await client
                 .from("shopping_list")
                 .delete()
                 .eq("id", value: id)
@@ -138,7 +138,7 @@ final class ShoppingListViewModel: ObservableObject {
     // MARK: - Mark as bought
     func markAsBought(id: UUID) async {
         do {
-            _ = try await client.database
+            _ = try await client
                 .from("shopping_list")
                 .update(BoughtUpdate(is_bought: true))
                 .eq("id", value: id)
@@ -154,7 +154,7 @@ final class ShoppingListViewModel: ObservableObject {
     func transferBoughtItemsToPantry() async {
         do {
             struct Row: Decodable { let id: UUID; let product_id: Int; let quantity: Double }
-            let rows: [Row] = try await client.database
+            let rows: [Row] = try await client
                 .from("shopping_list")
                 .select("id,product_id,quantity")
                 .eq("user_id", value: userId)
@@ -166,13 +166,13 @@ final class ShoppingListViewModel: ObservableObject {
             let pantryPayload: [PantryInsert] = rows.map { r in
                 PantryInsert(user_id: userId, product_id: r.product_id, quantity: r.quantity)
             }
-            _ = try await client.database
+            _ = try await client
                 .from("pantry")
                 .insert(pantryPayload)
                 .execute()
 
             let ids = rows.map { $0.id }
-            _ = try await client.database
+            _ = try await client
                 .from("shopping_list")
                 .delete()
                 .in("id", values: ids)

@@ -62,7 +62,7 @@ struct AddPantryItemView: View {
             }
             .task {
                 do {
-                    let rows: [ProductRow] = try await SupabaseManager.shared.client.database
+                    let rows: [ProductRow] = try await SupabaseManager.shared.client
                         .from("products")
                         .select("id,name,product_category_id")
                         .order("name")
@@ -85,7 +85,7 @@ struct AddPantryItemView: View {
         let client = SupabaseManager.shared.client
         Task {
             do {
-                _ = try await client.database
+                _ = try await client
                     .from("pantry")
                     .insert(payload)
                     .execute()

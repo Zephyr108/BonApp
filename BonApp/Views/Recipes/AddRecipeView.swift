@@ -227,7 +227,7 @@ struct AddRecipeView: View {
                 let path = "\(userId)/recipes/\(recipeId).jpg"
                 _ = try await client.storage
                     .from("recipes")
-                    .upload(path: path, file: data, options: FileOptions(cacheControl: "3600", contentType: "image/jpeg", upsert: true))
+                    .upload(path, data: data, options: FileOptions(cacheControl: "3600", contentType: "image/jpeg", upsert: true))
                 // Public URL (assuming bucket is public). If not public, you can create a signed URL.
                 imageURL = try client.storage.from("recipes").getPublicURL(path: path).absoluteString
             }
@@ -244,7 +244,7 @@ struct AddRecipeView: View {
                 ingredients: ingredientsArray
             )
 
-            _ = try await client.database
+            _ = try await client
                 .from("recipe")
                 .insert(recipeInsert)
                 .execute()
@@ -259,7 +259,7 @@ struct AddRecipeView: View {
                         instruction: text
                     )
                 }
-                _ = try await client.database
+                _ = try await client
                     .from("recipe_steps")
                     .insert(stepsPayload)
                     .execute()

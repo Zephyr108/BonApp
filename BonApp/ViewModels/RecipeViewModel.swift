@@ -73,7 +73,7 @@ final class RecipeViewModel: ObservableObject {
         error = nil
         defer { isLoading = false }
         do {
-            let rows: [RecipeDTO] = try await client.database
+            let rows: [RecipeDTO] = try await client
                 .from("recipe")
                 .select("id,title,description,prepare_time,photo,visibility,user_id")
                 .order("title", ascending: true)
@@ -112,7 +112,7 @@ final class RecipeViewModel: ObservableObject {
                 let path = "\(user_id)/recipes/\(recipeId).jpg"
                 _ = try await client.storage
                     .from("recipes")
-                    .upload(path: path, file: data, options: FileOptions(cacheControl: "3600", contentType: "image/jpeg", upsert: true))
+                    .upload(path, data: data, options: FileOptions(cacheControl: "3600", contentType: "image/jpeg", upsert: true))
                 photo = try client.storage.from("recipes").getPublicURL(path: path).absoluteString
             }
 
@@ -126,7 +126,7 @@ final class RecipeViewModel: ObservableObject {
                 user_id: user_id
             )
 
-            _ = try await client.database
+            _ = try await client
                 .from("recipe")
                 .insert(payload)
                 .execute()
@@ -155,7 +155,7 @@ final class RecipeViewModel: ObservableObject {
                 let path = "\(user_id)/recipes/\(id).jpg"
                 _ = try await client.storage
                     .from("recipes")
-                    .upload(path: path, file: data, options: FileOptions(cacheControl: "3600", contentType: "image/jpeg", upsert: true))
+                    .upload(path, data: data, options: FileOptions(cacheControl: "3600", contentType: "image/jpeg", upsert: true))
                 photo = try client.storage.from("recipes").getPublicURL(path: path).absoluteString
             }
 
@@ -166,7 +166,7 @@ final class RecipeViewModel: ObservableObject {
                 visibility: visibility
             )
 
-            _ = try await client.database
+            _ = try await client
                 .from("recipe")
                 .update(updatePayload)
                 .eq("id", value: id)
@@ -181,7 +181,7 @@ final class RecipeViewModel: ObservableObject {
     // MARK: - Delete
     func deleteRecipe(id: UUID) async {
         do {
-            _ = try await client.database
+            _ = try await client
                 .from("recipe")
                 .delete()
                 .eq("id", value: id)
@@ -199,7 +199,7 @@ final class RecipeViewModel: ObservableObject {
         do {
             struct StepsRow: Decodable { let steps_list: [String]? }
             // 1) Load current steps
-            let rows: [StepsRow] = try await client.database
+            let rows: [StepsRow] = try await client
                 .from("recipe")
                 .select("steps_list")
                 .eq("id", value: recipeId)
@@ -212,7 +212,7 @@ final class RecipeViewModel: ObservableObject {
             struct StepsUpdate: Encodable { let steps_list: [String] }
             let payload = StepsUpdate(steps_list: steps)
 
-            _ = try await client.database
+            _ = try await client
                 .from("recipe")
                 .update(payload)
                 .eq("id", value: recipeId)
@@ -227,7 +227,7 @@ final class RecipeViewModel: ObservableObject {
     func steps(for recipeId: UUID) async -> [RecipeStepDTO] {
         do {
             struct StepsRow: Decodable { let steps_list: [String]? }
-            let rows: [StepsRow] = try await client.database
+            let rows: [StepsRow] = try await client
                 .from("recipe")
                 .select("steps_list")
                 .eq("id", value: recipeId)

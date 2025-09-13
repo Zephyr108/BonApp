@@ -20,7 +20,7 @@ struct IngredientsListView: View {
     private func loadIngredients() async {
         do {
             let client = SupabaseManager.shared.client
-            let rows: [ProductRow] = try await client.database
+            let rows: [ProductRow] = try await client
                 .from("products")
                 .select("name")
                 .execute()

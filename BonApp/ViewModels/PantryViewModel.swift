@@ -52,7 +52,7 @@ final class PantryViewModel: ObservableObject {
         error = nil
         defer { isLoading = false }
         do {
-            let rows: [PantryItemDTO] = try await client.database
+            let rows: [PantryItemDTO] = try await client
                 .from("pantry")
                 .select("id,quantity,user_id,product_id,product:product_id(id,name,product_category_id)")
                 .eq("user_id", value: userId)
@@ -71,7 +71,7 @@ final class PantryViewModel: ObservableObject {
         struct InsertPayload: Encodable { let user_id: String; let product_id: Int; let quantity: Double }
         let payload = InsertPayload(user_id: userId, product_id: productId, quantity: quantity)
         do {
-            _ = try await client.database.from("pantry").insert(payload).execute()
+            _ = try await client.from("pantry").insert(payload).execute()
             await fetchPantryItems()
         } catch {
             await MainActor.run { self.error = error.localizedDescription }
@@ -83,7 +83,7 @@ final class PantryViewModel: ObservableObject {
         struct UpdatePayload: Encodable { let product_id: Int; let quantity: Double }
         let payload = UpdatePayload(product_id: productId, quantity: quantity)
         do {
-            _ = try await client.database
+            _ = try await client
                 .from("pantry")
                 .update(payload)
                 .eq("id", value: id)
@@ -98,7 +98,7 @@ final class PantryViewModel: ObservableObject {
     // MARK: - Delete
     func deleteItem(id: UUID) async {
         do {
-            _ = try await client.database
+            _ = try await client
                 .from("pantry")
                 .delete()
                 .eq("id", value: id)

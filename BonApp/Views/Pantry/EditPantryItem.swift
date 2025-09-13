@@ -69,7 +69,7 @@ struct EditPantryItemView: View {
 
     private func loadProducts() async {
         do {
-            let rows: [ProductRow] = try await SupabaseManager.shared.client.database
+            let rows: [ProductRow] = try await SupabaseManager.shared.client
                 .from("products")
                 .select("id,name,product_category_id")
                 .order("name")
@@ -92,7 +92,7 @@ struct EditPantryItemView: View {
                 let client = SupabaseManager.shared.client
                 struct UpdatePayload: Encodable { let product_id: Int; let quantity: Double }
                 let payload = UpdatePayload(product_id: prodId, quantity: qty)
-                _ = try await client.database
+                _ = try await client
                     .from("pantry")
                     .update(payload)
                     .eq("id", value: itemId)

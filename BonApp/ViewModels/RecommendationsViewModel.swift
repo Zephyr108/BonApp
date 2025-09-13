@@ -65,7 +65,7 @@ final class RecommendationsViewModel: ObservableObject {
                 p_budget: filterBudget
             )
 
-            let rows: [RecommendationRow] = try await client.database
+            let rows: [RecommendationRow] = try await client
                 .rpc("get_recommendations", params: params)
                 .execute()
                 .value

@@ -141,7 +141,7 @@ final class AuthViewModel: ObservableObject {
                     last_name: lastName,
                     preferences: preferences
                 )
-                _ = try await client.database
+                _ = try await client
                     .from("users")
                     .insert(insert)
                     .execute()
@@ -199,7 +199,7 @@ final class AuthViewModel: ObservableObject {
                         last_name: lastOrNil,
                         preferences: preferences.isEmpty ? nil : preferences
                     )
-                    _ = try await client.database
+                    _ = try await client
                         .from("users")
                         .update(update)
                         .eq("id", value: authUser.id.uuidString)
@@ -247,7 +247,7 @@ final class AuthViewModel: ObservableObject {
         let pass = password
 
         var lastError: Error?
-        for attempt in 1...3 {
+        for _ in 1...3 {
             do {
                 try await signInInternal(email: emailTrim, password: pass)
                 self.isAuthenticated = true
@@ -319,7 +319,7 @@ final class AuthViewModel: ObservableObject {
                 // We have an authenticated user
                 self.isAuthenticated = true
                 // fetch row from public.users
-                let rows: [DBUserRow] = try await client.database
+                let rows: [DBUserRow] = try await client
                     .from("users")
                     .select("id,email,username,first_name,last_name,preferences")
                     .eq("id", value: authUser.id.uuidString)

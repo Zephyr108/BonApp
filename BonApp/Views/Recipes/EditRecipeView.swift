@@ -300,7 +300,7 @@ struct EditRecipeView: View {
                 let path = "\(recipeId)/image.jpg"
                 _ = try await client.storage
                     .from("recipes")
-                    .upload(path: path, file: data, options: FileOptions(cacheControl: "3600", contentType: "image/jpeg", upsert: true))
+                    .upload(path, data: data, options: FileOptions(cacheControl: "3600", contentType: "image/jpeg", upsert: true))
                 newImageURL = try client.storage.from("recipes").getPublicURL(path: path).absoluteString
                 imageRemoved = false
             } else if imageRemoved {
@@ -317,7 +317,7 @@ struct EditRecipeView: View {
                 image_url: newImageURL
             )
 
-            _ = try await client.database
+            _ = try await client
                 .from("recipe")
                 .update(updatePayload)
                 .eq("id", value: recipeId)
@@ -325,12 +325,12 @@ struct EditRecipeView: View {
                 .execute()
 
             // 2) Replace steps: delete existing, insert new
-            _ = try await client.database
+            _ = try await client
                 .from("recipe_steps")
                 .delete()
                 .eq("recipe_id", value: recipeId)
                 .execute()
-
+            
             if !stepTexts.isEmpty {
                 let stepsPayload: [RecipeStepInsert] = stepTexts.enumerated().map { (index, text) in
                     RecipeStepInsert(
@@ -340,7 +340,7 @@ struct EditRecipeView: View {
                         instruction: text
                     )
                 }
-                _ = try await client.database
+                _ = try await client
                     .from("recipe_steps")
                     .insert(stepsPayload)
                     .execute()

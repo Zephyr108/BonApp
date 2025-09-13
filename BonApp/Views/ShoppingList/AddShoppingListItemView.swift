@@ -48,7 +48,7 @@ struct AddShoppingListItemView: View {
                 .padding(.horizontal, 16)
                 .task {
                     do {
-                        let rows: [ProductRow] = try await SupabaseManager.shared.client.database
+                        let rows: [ProductRow] = try await SupabaseManager.shared.client
                             .from("products")
                             .select("id,name,product_category_id")
                             .order("name")
