@@ -86,13 +86,13 @@ final class RecipeListViewModel: ObservableObject {
                 .eq("recipe_id", value: id)
                 .execute()
         } catch {
-            await MainActor.run { self.error = error.localizedDescription }
+            _ = await MainActor.run { self.error = error.localizedDescription }
         }
     }
 
     func toggleFavorite(userId: String, recipeId: UUID) async {
         if favorites.contains(recipeId) {
-            // remove
+            // remove from favorites
             do {
                 _ = try await client
                     .from("favorite_recipe")
@@ -100,21 +100,21 @@ final class RecipeListViewModel: ObservableObject {
                     .eq("user_id", value: userId)
                     .eq("recipe_id", value: recipeId)
                     .execute()
-                await MainActor.run { self.favorites.remove(recipeId) }
+                _ = await MainActor.run { self.favorites.remove(recipeId) }
             } catch {
-                await MainActor.run { self.error = error.localizedDescription }
+                _ = await MainActor.run { self.error = error.localizedDescription }
             }
         } else {
-            // add
+            // add to favorites
             do {
                 let payload = FavoriteInsert(user_id: userId, recipe_id: recipeId)
                 _ = try await client
                     .from("favorite_recipe")
                     .insert(payload)
                     .execute()
-                await MainActor.run { self.favorites.insert(recipeId) }
+                _ = await MainActor.run { self.favorites.insert(recipeId) }
             } catch {
-                await MainActor.run { self.error = error.localizedDescription }
+                _ = await MainActor.run { self.error = error.localizedDescription }
             }
         }
     }
