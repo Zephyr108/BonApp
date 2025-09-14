@@ -5,18 +5,17 @@ import Supabase
 struct SearchRecipeItem: Identifiable, Hashable, Decodable {
     let id: UUID
     let title: String
-    let detail: String?
+    let description: String?
     let cookTime: Int
     let imageURL: String?
     let isPublic: Bool
     let userId: String
-    let ingredients: [String]
 
     enum CodingKeys: String, CodingKey {
-        case id, title, detail, ingredients
-        case cookTime = "cook_time"
-        case imageURL = "image_url"
-        case isPublic = "is_public"
+        case id, title, description
+        case cookTime = "prepare_time"
+        case imageURL = "photo"
+        case isPublic = "visibility"
         case userId = "user_id"
     }
 }
@@ -54,10 +53,10 @@ final class RecipeSearchViewModel: ObservableObject {
 
             var rq = client
                 .from("recipe")
-                .select("id,title,detail,cook_time,image_url,is_public,user_id,ingredients")
+                .select("id,title,description,prepare_time,photo,visibility,user_id")
 
             // Apply filters first (on PostgrestFilterBuilder)
-            rq = rq.lte("cook_time", value: maxCookTime)
+            rq = rq.lte("prepare_time", value: maxCookTime)
 
             let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
             if !trimmed.isEmpty {
@@ -90,9 +89,10 @@ struct RecipeSearchView: View {
     @State private var searchText: String = ""
     @State private var maxCookTime: Double = 60
     @State private var showOnlyFavorites: Bool = false
+    @State private var path: [SearchRecipeItem] = []
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             VStack {
                 HStack {
                     Text("Max czas: \(Int(maxCookTime)) min")
@@ -144,11 +144,31 @@ struct RecipeSearchView: View {
             .navigationDestination(for: SearchRecipeItem.self) { recipe in
                 destination(for: recipe)
             }
-            .task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, currentUserId: auth.currentUser?.id) }
-            .onChange(of: searchText) { _, _ in Task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, currentUserId: auth.currentUser?.id) } }
-            .onChange(of: maxCookTime) { _, _ in Task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, currentUserId: auth.currentUser?.id) } }
-            .onChange(of: showOnlyFavorites) { _, _ in Task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, currentUserId: auth.currentUser?.id) } }
-            .onChange(of: auth.currentUser?.id) { _, _ in Task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, currentUserId: auth.currentUser?.id) } }
+            .task {
+                if path.isEmpty {
+                    await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, currentUserId: auth.currentUser?.id)
+                }
+            }
+            .onChange(of: searchText, initial: false) { _, _ in
+                if path.isEmpty {
+                    Task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, currentUserId: auth.currentUser?.id) }
+                }
+            }
+            .onChange(of: maxCookTime, initial: false) { _, _ in
+                if path.isEmpty {
+                    Task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, currentUserId: auth.currentUser?.id) }
+                }
+            }
+            .onChange(of: showOnlyFavorites, initial: false) { _, _ in
+                if path.isEmpty {
+                    Task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, currentUserId: auth.currentUser?.id) }
+                }
+            }
+            .onChange(of: auth.currentUser?.id, initial: false) { _, _ in
+                if path.isEmpty {
+                    Task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, currentUserId: auth.currentUser?.id) }
+                }
+            }
         }
     }
 
@@ -156,10 +176,10 @@ struct RecipeSearchView: View {
         RecipeDetailView(recipe: RecipeDetailItem(
             id: recipe.id,
             title: recipe.title,
-            detail: recipe.detail,
+            detail: recipe.description,
             cookTime: recipe.cookTime,
             imageURL: recipe.imageURL,
-            ingredients: recipe.ingredients,
+            ingredients: [],
             isPublic: recipe.isPublic,
             userId: recipe.userId,
             steps: []

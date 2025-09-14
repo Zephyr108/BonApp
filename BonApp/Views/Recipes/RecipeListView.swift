@@ -1,22 +1,20 @@
 import SwiftUI
 import Supabase
 
-// Minimal DTO for list rows
 struct RecipeListItem: Identifiable, Hashable, Decodable {
     let id: UUID
     let title: String
-    let detail: String?
+    let description: String?
     let cookTime: Int
     let imageURL: String?
     let isPublic: Bool
     let authorId: String
-    let ingredients: [String]
 
     enum CodingKeys: String, CodingKey {
-        case id, title, detail, ingredients
-        case cookTime = "cook_time"
-        case imageURL = "image_url"
-        case isPublic = "is_public"
+        case id, title, description
+        case cookTime = "prepare_time"
+        case imageURL = "photo"
+        case isPublic = "visibility"
         case authorId = "user_id"
     }
 }
@@ -44,7 +42,7 @@ final class RecipeListViewModel: ObservableObject {
         do {
             let rows: [RecipeListItem] = try await client
                 .from("recipe")
-                .select("id,title,detail,cook_time,image_url,is_public,user_id,ingredients")
+                .select("id,title,description,prepare_time,photo,visibility,user_id")
                 .order("title", ascending: true)
                 .execute()
                 .value
@@ -235,10 +233,10 @@ struct RecipeListView: View {
         RecipeDetailView(recipe: RecipeDetailItem(
             id: recipe.id,
             title: recipe.title,
-            detail: recipe.detail,
+            detail: recipe.description,
             cookTime: recipe.cookTime,
             imageURL: recipe.imageURL,
-            ingredients: recipe.ingredients,
+            ingredients: [],
             isPublic: recipe.isPublic,
             userId: recipe.authorId,
             steps: [] // możesz doładować w szczegółach jeśli chcesz
