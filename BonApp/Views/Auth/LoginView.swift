@@ -24,6 +24,8 @@ struct LoginView: View {
                                 .stroke(Color("textfieldBorder"), lineWidth: 1)
                         )
                         .cornerRadius(8)
+                        .textContentType(.emailAddress)
+                        .submitLabel(.next)
 
                     SecureField("Hasło", text: $auth.password)
                         .foregroundColor(Color("textPrimary"))
@@ -34,6 +36,17 @@ struct LoginView: View {
                                 .stroke(Color("textfieldBorder"), lineWidth: 1)
                         )
                         .cornerRadius(8)
+                        .submitLabel(.go)
+                        .onSubmit {
+                            Task {
+                                await auth.login()
+                                print("[LoginView] after login: isAuthenticated=\(auth.isAuthenticated), error=\(auth.errorMessage ?? "nil")")
+                                if auth.isAuthenticated {
+                                    await auth.refreshAuthState()
+                                    dismiss()
+                                }
+                            }
+                        }
 
                     if let errorKey = auth.errorMessage {
                         // Show raw error text (not as a localization key) for clearer diagnostics
@@ -45,7 +58,11 @@ struct LoginView: View {
                         Task {
                             await auth.login()
                             print("[LoginView] after login: isAuthenticated=\(auth.isAuthenticated), error=\(auth.errorMessage ?? "nil")")
-                            if auth.isAuthenticated { dismiss() }
+                            if auth.isAuthenticated {
+                                // dociągnij profil/sesję zanim zamkniesz ekran, żeby ContentView miał już dane
+                                await auth.refreshAuthState()
+                                dismiss()
+                            }
                         }
                     }
                     .disabled(auth.email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || auth.password.isEmpty || auth.isLoading)

@@ -36,6 +36,14 @@ private struct DBUserInsert: Encodable {
     let preferences: String?
 }
 
+private struct DBUserInsertNoId: Encodable {
+    let email: String
+    let username: String?
+    let first_name: String
+    let last_name: String?
+    let preferences: String?
+}
+
 private struct DBUserUpdate: Encodable {
     let email: String
     let username: String?
@@ -56,6 +64,7 @@ final class AuthViewModel: ObservableObject {
     @Published var currentUser: AppUser? = nil
     @Published var errorMessage: String? = nil
     @Published var isLoading: Bool = false
+    @Published private(set) var isRefreshingAuth: Bool = false
 
     private let client: SupabaseClient
     private var cancellables = Set<AnyCancellable>()
@@ -126,28 +135,40 @@ final class AuthViewModel: ObservableObject {
 
         do {
             // 1) Sign up in Supabase Auth
-            _ = try await client.auth.signUp(
+            let result = try await client.auth.signUp(
                 email: email,
                 password: password
             )
 
-            // 2) Insert a row into public.users (FK id = auth.users.id)
-            if let authUser = try? await client.auth.user() {
-                let insert = DBUserInsert(
-                    id: authUser.id.uuidString,
-                    email: email,
-                    username: username,
-                    first_name: firstName,
-                    last_name: lastName,
-                    preferences: preferences
-                )
+            // 2) If no session yet (email confirmation flow), DO NOT insert to public.users now – RLS would reject.
+            //    Poczekaj aż użytkownik się zaloguje po potwierdzeniu – wtedy refreshAuthState zadba o resztę.
+            guard result.session != nil else {
+                await refreshAuthState()
+                // komunikat przyjazny – konto utworzone, sprawdź maila
+                if self.isAuthenticated == false { self.errorMessage = "Check your email to confirm the account." }
+                return
+            }
+
+            // 3) We have a session – insert profile row, letting DB assign id := auth.uid() by DEFAULT
+            let insert = DBUserInsertNoId(
+                email: email,
+                username: username,
+                first_name: firstName,
+                last_name: lastName,
+                preferences: preferences
+            )
+            do {
                 _ = try await client
                     .from("users")
                     .insert(insert)
                     .execute()
+            } catch {
+                // Jeśli polityka RLS nadal zablokuje (np. nietypowe ustawienia), nie psuj rejestracji
+                let nsErr = error as NSError
+                if nsErr.domain != NSURLErrorDomain { print("[Auth] users insert warning:", error.localizedDescription) }
             }
 
-            // 3) Refresh local state
+            // 4) Refresh local state
             await refreshAuthState()
             self.email = ""; self.password = ""; self.name = ""; self.preferences = ""
         } catch {
@@ -314,11 +335,23 @@ final class AuthViewModel: ObservableObject {
     // MARK: - Session/User helpers
     @MainActor
     func refreshAuthState() async {
+        // Prevent overlapping refreshes that cause flicker
+        if isRefreshingAuth { return }
+        isRefreshingAuth = true
+        defer { isRefreshingAuth = false }
+
         do {
-            if let authUser = try? await client.auth.user() {
-                // We have an authenticated user
-                self.isAuthenticated = true
-                // fetch row from public.users
+            // 1) Check session
+            guard let authUser = try? await client.auth.user() else {
+                // No session – mark logged out
+                self.isAuthenticated = false
+                self.currentUser = nil
+                return
+            }
+
+            // 2) Try to load profile row; build AppUser
+            var nextUser: AppUser
+            do {
                 let rows: [DBUserRow] = try await client
                     .from("users")
                     .select("id,email,username,first_name,last_name,preferences")
@@ -326,9 +359,11 @@ final class AuthViewModel: ObservableObject {
                     .limit(1)
                     .execute()
                     .value
+
                 if let row = rows.first {
-                    let displayName = [row.first_name, row.last_name ?? ""].joined(separator: " ").trimmingCharacters(in: .whitespaces)
-                    self.currentUser = AppUser(
+                    let displayName = [row.first_name, row.last_name ?? ""].joined(separator: " ")
+                        .trimmingCharacters(in: .whitespaces)
+                    nextUser = AppUser(
                         id: row.id,
                         email: row.email,
                         name: displayName.isEmpty ? row.first_name : displayName,
@@ -336,8 +371,7 @@ final class AuthViewModel: ObservableObject {
                         avatarColorHex: nil
                     )
                 } else {
-                    // No row in users yet — fall back to auth email
-                    self.currentUser = AppUser(
+                    nextUser = AppUser(
                         id: authUser.id.uuidString,
                         email: authUser.email ?? "",
                         name: nil,
@@ -345,13 +379,14 @@ final class AuthViewModel: ObservableObject {
                         avatarColorHex: nil
                     )
                 }
-            } else {
-                self.isAuthenticated = false
-                self.currentUser = nil
             }
+
+            // 3) Publish once (prevents temporary fallback to logged-out)
+            self.isAuthenticated = true
+            self.currentUser = nextUser
         } catch {
-            self.isAuthenticated = false
-            self.currentUser = nil
+            // Network/temporary problems – do not flip to logged-out state
+            print("[Auth] refreshAuthState error:", error.localizedDescription)
         }
     }
 

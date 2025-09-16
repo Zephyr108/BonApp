@@ -5,6 +5,12 @@ struct ContentView: View {
     @State private var selectedTab: Tab = .recipes
     @EnvironmentObject var auth: AuthViewModel
 
+    // Treat user as logged-in if either the flag is true or we already have a user row
+    private var isLoggedInStable: Bool { auth.isAuthenticated || auth.currentUser != nil }
+
+    // Avoid flicker: until we refresh auth once, show placeholders instead of logged-out UI
+    @State private var bootstrapped = false
+
     private var currentUser: AppUser? { auth.currentUser }
 
     var body: some View {
@@ -13,7 +19,7 @@ struct ContentView: View {
                 .tabItem { Label("Przepisy", systemImage: "book") }
                 .tag(Tab.recipes)
 
-            if auth.isAuthenticated {
+            if isLoggedInStable {
                 if let user = currentUser {
                     PantryView()
                         .tabItem { Label("Spiżarnia", systemImage: "tray.fill") }
@@ -27,8 +33,13 @@ struct ContentView: View {
                     ProgressView().tabItem { Label("Zakupy", systemImage: "cart.fill") }.tag(Tab.shopping)
                 }
             } else {
-                EmptyView().tabItem { Label("Spiżarnia", systemImage: "tray.fill") }.tag(Tab.pantry)
-                EmptyView().tabItem { Label("Zakupy", systemImage: "cart.fill") }.tag(Tab.shopping)
+                if !bootstrapped {
+                    ProgressView().tabItem { Label("Spiżarnia", systemImage: "tray.fill") }.tag(Tab.pantry)
+                    ProgressView().tabItem { Label("Zakupy", systemImage: "cart.fill") }.tag(Tab.shopping)
+                } else {
+                    EmptyView().tabItem { Label("Spiżarnia", systemImage: "tray.fill") }.tag(Tab.pantry)
+                    EmptyView().tabItem { Label("Zakupy", systemImage: "cart.fill") }.tag(Tab.shopping)
+                }
             }
 
             NavigationStack {
@@ -40,14 +51,23 @@ struct ContentView: View {
             .tag(Tab.account)
         }
         .background(Color("background").ignoresSafeArea())
+        .task {
+            if !bootstrapped {
+                await auth.refreshAuthState()
+                bootstrapped = true
+            }
+        }
         .onChange(of: auth.isAuthenticated, initial: false) { _, isAuth in
             if isAuth { selectedTab = .recipes }
+        }
+        .onChange(of: auth.currentUser, initial: false) { _, user in
+            if user != nil { selectedTab = .recipes }
         }
     }
 
     @ViewBuilder
     private var accountContent: some View {
-        if auth.isAuthenticated {
+        if isLoggedInStable {
             ZStack {
                 Color("background").ignoresSafeArea()
                 VStack(spacing: 12) {
@@ -71,28 +91,32 @@ struct ContentView: View {
         } else {
             ZStack {
                 Color("background").ignoresSafeArea()
-                VStack(spacing: 16) {
-                    NavigationLink(destination: LoginView()) {
-                        Text("Zaloguj")
-                            .foregroundColor(Color("buttonText"))
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                            .background(Color("login"))
-                            .cornerRadius(8)
-                            .padding(.horizontal)
+                if !bootstrapped {
+                    ProgressView()
+                } else {
+                    VStack(spacing: 16) {
+                        NavigationLink(destination: LoginView()) {
+                            Text("Zaloguj")
+                                .foregroundColor(Color("buttonText"))
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .background(Color("login"))
+                                .cornerRadius(8)
+                                .padding(.horizontal)
+                        }
+                        NavigationLink(destination: RegistrationView()) {
+                            Text("Rejestracja")
+                                .foregroundColor(Color("buttonText"))
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .background(Color("register"))
+                                .cornerRadius(8)
+                                .padding(.horizontal)
+                        }
                     }
-                    NavigationLink(destination: RegistrationView()) {
-                        Text("Rejestracja")
-                            .foregroundColor(Color("buttonText"))
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                            .background(Color("register"))
-                            .cornerRadius(8)
-                            .padding(.horizontal)
-                    }
+                }
                 }
             }
         }
     }
-}
 
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
