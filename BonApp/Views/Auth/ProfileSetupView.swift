@@ -12,7 +12,6 @@ struct ProfileSetupView: View {
 
     @State private var name: String = ""
     @State private var preferences: String = ""
-    @State private var avatarColor: Color = .blue
     @State private var email: String = ""
     @State private var password: String = ""
 
@@ -20,36 +19,6 @@ struct ProfileSetupView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
-
-                    Text("Avatar")
-                        .foregroundColor(Color("textSecondary"))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    HStack {
-                        Spacer()
-                        Image(systemName: "person.circle.fill")
-                            .resizable()
-                            .frame(width: 80, height: 80)
-                            .foregroundColor(avatarColor)
-                            .padding()
-                            .background(Color("textfieldBackground"))
-                            .clipShape(Circle())
-                        Spacer()
-                    }
-
-                    HStack {
-                        Text("Kolor ikony")
-                            .foregroundColor(Color("textPrimary"))
-                        Spacer()
-                        ColorPicker("", selection: $avatarColor)
-                    }
-                    .padding(16)
-                    .background(Color("textfieldBackground"))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color("textfieldBorder"), lineWidth: 1)
-                    )
-                    .cornerRadius(8)
 
                     Text("Imię")
                         .foregroundColor(Color("textSecondary"))
@@ -133,7 +102,7 @@ struct ProfileSetupView: View {
             .navigationBarTitleDisplayMode(.inline)
             .background(Color("background").ignoresSafeArea())
             .onAppear { syncFromAuthIfNeeded() }
-            .onChange(of: auth.currentUser) { _, _ in syncFromAuthIfNeeded() }
+            .onChange(of: auth.currentUser, initial: false) { _, _ in syncFromAuthIfNeeded() }
         }
     }
 
@@ -145,10 +114,10 @@ struct ProfileSetupView: View {
 
     private func syncFromAuthIfNeeded() {
         guard let u = auth.currentUser else { return }
-        if name.isEmpty { name = u.name ?? "" }
+        if name.isEmpty { name = u.first_name ?? "" }
         if preferences.isEmpty { preferences = u.preferences ?? "" }
         if email.isEmpty { email = u.email }
-        if let hex = u.avatarColorHex, let c = Color(hex: hex) { avatarColor = c }
+        // Avatar color is stored locally for now; if you later add it to the profile, load it here.
     }
 
     private func saveProfile() {
@@ -156,17 +125,16 @@ struct ProfileSetupView: View {
         let trimmedPrefs = preferences.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedPass = password.trimmingCharacters(in: .whitespacesAndNewlines)
-        let hex = avatarColor.toHex()
 
-        auth.updateProfile(
-            name: trimmedName,
-            preferences: trimmedPrefs,
-            avatarColorHex: hex,
-            email: trimmedEmail,
-            password: trimmedPass
-        )
-        // AuthViewModel odświeży stan; zamknij po wywołaniu
-        dismiss()
+        Task {
+            await auth.updateProfile(
+                name: trimmedName,
+                preferences: trimmedPrefs,
+                email: trimmedEmail,
+                password: trimmedPass
+            )
+            dismiss()
+        }
     }
 }
 

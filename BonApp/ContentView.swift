@@ -68,26 +68,8 @@ struct ContentView: View {
     @ViewBuilder
     private var accountContent: some View {
         if isLoggedInStable {
-            ZStack {
-                Color("background").ignoresSafeArea()
-                VStack(spacing: 12) {
-                    if let user = currentUser {
-                        Text("Zalogowano jako \(user.email)")
-                            .foregroundColor(Color("textPrimary"))
-                    } else {
-                        Text("Zalogowano")
-                            .foregroundColor(Color("textPrimary"))
-                    }
-                    Button("Wyloguj") {
-                        Task { await auth.logout() }
-                    }
-                    .foregroundColor(Color("buttonText"))
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .background(Color("register"))
-                    .cornerRadius(8)
-                    .padding(.horizontal)
-                }
-            }
+            // Zalogowany: od razu pokaż ekran profilu
+            ProfileSetupView()
         } else {
             ZStack {
                 Color("background").ignoresSafeArea()

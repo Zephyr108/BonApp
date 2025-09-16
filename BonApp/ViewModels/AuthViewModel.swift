@@ -13,9 +13,12 @@ import Supabase
 struct AppUser: Equatable {
     let id: String
     var email: String
+    /// Full display name (first + last) if available
     var name: String?
     var preferences: String?
-    var avatarColorHex: String?
+    /// Keep DB-style fields for legacy views expecting them
+    var first_name: String?
+    var last_name: String?
 }
 
 private struct DBUserRow: Decodable {
@@ -94,11 +97,10 @@ final class AuthViewModel: ObservableObject {
 
         Task { @MainActor in
             do {
-                // Attach initial metadata (name, prefs, avatar)
+                // Attach initial metadata (name, prefs)
                 let metadata: [String: AnyJSON] = [
                     "name": .string(name),
-                    "preferences": preferences.isEmpty ? .null : .string(preferences),
-                    "avatarColorHex": .string("#000000")
+                    "preferences": preferences.isEmpty ? .null : .string(preferences)
                 ]
 
                 _ = try await client.auth.signUp(
@@ -177,7 +179,7 @@ final class AuthViewModel: ObservableObject {
     }
 
     // MARK: - Update profile (user metadata, email, password)
-    func updateProfile(name: String, preferences: String, avatarColorHex: String, email: String, password: String) {
+    func updateProfile(name: String, preferences: String, email: String, password: String) {
         guard currentUser != nil else {
             errorMessage = "No authenticated user."
             return
@@ -233,6 +235,7 @@ final class AuthViewModel: ObservableObject {
             }
         }
     }
+
 
     // MARK: - Login
     func login() {
@@ -368,7 +371,8 @@ final class AuthViewModel: ObservableObject {
                         email: row.email,
                         name: displayName.isEmpty ? row.first_name : displayName,
                         preferences: row.preferences,
-                        avatarColorHex: nil
+                        first_name: row.first_name,
+                        last_name: row.last_name
                     )
                 } else {
                     nextUser = AppUser(
@@ -376,7 +380,8 @@ final class AuthViewModel: ObservableObject {
                         email: authUser.email ?? "",
                         name: nil,
                         preferences: nil,
-                        avatarColorHex: nil
+                        first_name: nil,
+                        last_name: nil
                     )
                 }
             }
