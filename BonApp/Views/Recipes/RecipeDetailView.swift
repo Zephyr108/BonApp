@@ -2,11 +2,11 @@
 //  RecipeDetailView.swift
 //  BonApp
 //
-//  Migrated to Supabase (no Core Data)
 //
 
 import SwiftUI
 import UIKit
+import Supabase
 
 // MARK: - DTOs
 struct RecipeStepItem: Identifiable, Hashable, Decodable {
@@ -25,11 +25,60 @@ struct RecipeDetailItem: Identifiable, Hashable, Decodable {
     let isPublic: Bool
     let userId: String
     let steps: [RecipeStepItem]
+
+    enum CodingKeys: String, CodingKey {
+        case id, title
+        case detail = "description"
+        case cookTime = "prepare_time"
+        case imageURL = "photo"
+        case isPublic = "visibility"
+        case userId = "user_id"
+        case stepsList = "steps_list"
+        // ingredients are not in DB – they may be built elsewhere; default empty
+    }
+
+    init(id: UUID, title: String, detail: String?, cookTime: Int, imageURL: String?, ingredients: [String], isPublic: Bool, userId: String, steps: [RecipeStepItem]) {
+        self.id = id
+        self.title = title
+        self.detail = detail
+        self.cookTime = cookTime
+        self.imageURL = imageURL
+        self.ingredients = ingredients
+        self.isPublic = isPublic
+        self.userId = userId
+        self.steps = steps
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try c.decode(UUID.self, forKey: .id)
+        self.title = try c.decode(String.self, forKey: .title)
+        self.detail = try c.decodeIfPresent(String.self, forKey: .detail)
+        self.cookTime = try c.decodeIfPresent(Int.self, forKey: .cookTime) ?? 0
+        self.imageURL = try c.decodeIfPresent(String.self, forKey: .imageURL)
+        self.isPublic = try c.decodeIfPresent(Bool.self, forKey: .isPublic) ?? true
+        self.userId = try c.decodeIfPresent(String.self, forKey: .userId) ?? ""
+
+        // Ingredients are not persisted in current schema; default to empty
+        self.ingredients = []
+
+        // Decode steps_list – support both array of objects and array of strings
+        if let stepObjs = try? c.decode([RecipeStepItem].self, forKey: .stepsList) {
+            self.steps = stepObjs.sorted { $0.order < $1.order }
+        } else if let stepStrings = try? c.decode([String].self, forKey: .stepsList) {
+            self.steps = stepStrings.enumerated().map { idx, text in
+                RecipeStepItem(id: UUID(), order: idx + 1, instruction: text)
+            }
+        } else {
+            self.steps = []
+        }
+    }
 }
 
 struct RecipeDetailView: View {
     let recipe: RecipeDetailItem
     @EnvironmentObject var auth: AuthViewModel
+    @State private var loadedSteps: [RecipeStepItem] = []
 
     var body: some View {
         ZStack {
@@ -77,9 +126,20 @@ struct RecipeDetailView: View {
                     Text("Kroki")
                         .font(.headline)
                         .foregroundColor(Color("textSecondary"))
-                    ForEach(recipe.steps.sorted { $0.order < $1.order }) { step in
-                        Text("Krok \(step.order): \(step.instruction)")
-                            .foregroundColor(Color("textPrimary"))
+
+                    let stepsToShow = (loadedSteps.isEmpty ? recipe.steps : loadedSteps)
+                        .sorted { $0.order < $1.order }
+
+                    if stepsToShow.isEmpty {
+                        Text("Brak kroków")
+                            .foregroundColor(Color("textSecondary"))
+                    } else {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(stepsToShow) { step in
+                                Text("• \(step.instruction)")
+                                    .foregroundColor(Color("textPrimary"))
+                            }
+                        }
                     }
                 }
                 .padding()
@@ -104,6 +164,42 @@ struct RecipeDetailView: View {
                     }
                 }
             }
+        }
+        .task {
+            if recipe.steps.isEmpty {
+                await loadStepsFromDB()
+            }
+        }
+    }
+
+    private func loadStepsFromDB() async {
+        do {
+            let resp = try await SupabaseManager.shared.client
+                .from("recipe")
+                .select("steps_list")
+                .eq("id", value: recipe.id)
+                .single()
+                .execute()
+
+            let data = resp.data
+
+            struct StepsObj: Decodable { let steps_list: [RecipeStepItem]? }
+            struct StepsStr: Decodable { let steps_list: [String]? }
+
+            if let obj = try? JSONDecoder().decode(StepsObj.self, from: data),
+               let arr = obj.steps_list {
+                await MainActor.run { self.loadedSteps = arr.sorted { $0.order < $1.order } }
+                return
+            }
+            if let str = try? JSONDecoder().decode(StepsStr.self, from: data),
+               let arr = str.steps_list {
+                let mapped = arr.enumerated().map { idx, s in
+                    RecipeStepItem(id: UUID(), order: idx + 1, instruction: s)
+                }
+                await MainActor.run { self.loadedSteps = mapped }
+            }
+        } catch {
+            print("[RecipeDetailView] loadStepsFromDB error:", error)
         }
     }
 

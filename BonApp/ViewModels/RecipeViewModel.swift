@@ -36,12 +36,26 @@ private struct RecipeInsert: Encodable {
     let photo: String?
     let visibility: Bool
     let user_id: String
+    let steps_list: [String]?
 }
 
 private struct RecipeUpdate: Encodable {
     let description: String
     let prepare_time: Int
     let photo: String?
+    let visibility: Bool
+}
+
+private struct RecipeUpdateNoPhoto: Encodable {
+    let description: String
+    let prepare_time: Int
+    let visibility: Bool
+}
+
+private struct RecipeUpdateWithPhoto: Encodable {
+    let description: String
+    let prepare_time: Int
+    let photo: String
     let visibility: Bool
 }
 
@@ -95,6 +109,7 @@ final class RecipeViewModel: ObservableObject {
 
     // MARK: - Add
     /// Tworzy nowy przepis w Supabase. Jeśli podasz `imageData`, zapisze plik w bucketcie `recipes`.
+    @MainActor
     func addRecipe(
         title: String,
         description: String,
@@ -104,26 +119,36 @@ final class RecipeViewModel: ObservableObject {
         visibility: Bool,
         user_id: String
     ) async {
+        guard !isLoading else { return }
+        isLoading = true
+        error = nil
+        defer { isLoading = false }
+
         let recipeId = UUID()
-        var photo: String? = nil
+        var uploadedPath: String? = nil
+        var photoURL: String? = nil
+
         do {
-            // 1) Opcjonalny upload zdjęcia
+            // 1) Optional image upload
             if let data = imageData {
                 let path = "\(user_id)/recipes/\(recipeId).jpg"
                 _ = try await client.storage
                     .from("recipes")
                     .upload(path, data: data, options: FileOptions(cacheControl: "3600", contentType: "image/jpeg", upsert: true))
-                photo = try client.storage.from("recipes").getPublicURL(path: path).absoluteString
+                uploadedPath = path
+                photoURL = try client.storage.from("recipes").getPublicURL(path: path).absoluteString
             }
 
+            // 2) Insert row
             let payload = RecipeInsert(
                 id: recipeId,
                 title: title,
                 description: description,
                 prepare_time: prepare_time,
-                photo: photo,
+                photo: photoURL,
                 visibility: visibility,
-                user_id: user_id
+                user_id: user_id,
+                steps_list: []
             )
 
             _ = try await client
@@ -133,7 +158,11 @@ final class RecipeViewModel: ObservableObject {
 
             await fetchRecipes()
         } catch {
-            await MainActor.run { self.error = error.localizedDescription }
+            // If DB insert failed but we already uploaded image, try to remove the orphan file
+            if let path = uploadedPath {
+                try? await client.storage.from("recipes").remove(paths: [path])
+            }
+            self.error = error.localizedDescription
         }
     }
 
@@ -150,31 +179,48 @@ final class RecipeViewModel: ObservableObject {
         user_id: String
     ) async {
         do {
-            var photo: String? = nil
+            var payloadNoPhoto: RecipeUpdateNoPhoto? = nil
+            var payloadWithPhoto: RecipeUpdateWithPhoto? = nil
+            var uploadedPath: String? = nil
+
             if let data = newImageData {
                 let path = "\(user_id)/recipes/\(id).jpg"
                 _ = try await client.storage
                     .from("recipes")
                     .upload(path, data: data, options: FileOptions(cacheControl: "3600", contentType: "image/jpeg", upsert: true))
-                photo = try client.storage.from("recipes").getPublicURL(path: path).absoluteString
+                uploadedPath = path
+                let publicURL = try client.storage.from("recipes").getPublicURL(path: path).absoluteString
+                payloadWithPhoto = RecipeUpdateWithPhoto(
+                    description: description,
+                    prepare_time: prepare_time,
+                    photo: publicURL,
+                    visibility: visibility
+                )
+            } else {
+                payloadNoPhoto = RecipeUpdateNoPhoto(
+                    description: description,
+                    prepare_time: prepare_time,
+                    visibility: visibility
+                )
             }
 
-            let updatePayload = RecipeUpdate(
-                description: description,
-                prepare_time: prepare_time,
-                photo: photo,
-                visibility: visibility
-            )
-
-            _ = try await client
-                .from("recipe")
-                .update(updatePayload)
-                .eq("id", value: id)
-                .execute()
+            if let p = payloadWithPhoto {
+                _ = try await client
+                    .from("recipe")
+                    .update(p)
+                    .eq("id", value: id)
+                    .execute()
+            } else if let p = payloadNoPhoto {
+                _ = try await client
+                    .from("recipe")
+                    .update(p)
+                    .eq("id", value: id)
+                    .execute()
+            }
 
             await fetchRecipes()
         } catch {
-            await MainActor.run { self.error = error.localizedDescription }
+            self.error = error.localizedDescription
         }
     }
 
@@ -186,6 +232,13 @@ final class RecipeViewModel: ObservableObject {
                 .delete()
                 .eq("id", value: id)
                 .execute()
+
+            // Best-effort: remove possible image file with known pattern
+            // (ignores errors if file doesn't exist)
+            if let uid = currentUserId {
+                let path = "\(uid)/recipes/\(id).jpg"
+                try? await client.storage.from("recipes").remove(paths: [path])
+            }
 
             await fetchRecipes()
         } catch {
@@ -222,25 +275,31 @@ final class RecipeViewModel: ObservableObject {
         }
     }
 
-    /// Zwraca kroki przepisu posortowane po `order`.
+    /// Zwraca surową listę kroków dokładnie tak, jak jest zapisana w kolumnie `steps_list` (JSONB array of strings).
     @MainActor
-    func steps(for recipeId: UUID) async -> [RecipeStepDTO] {
+    func rawSteps(for recipeId: UUID) async -> [String] {
         do {
             struct StepsRow: Decodable { let steps_list: [String]? }
-            let rows: [StepsRow] = try await client
+            let row: StepsRow = try await client
                 .from("recipe")
                 .select("steps_list")
                 .eq("id", value: recipeId)
-                .limit(1)
+                .single()
                 .execute()
                 .value
-            let steps = rows.first?.steps_list ?? []
-            return steps.enumerated().map { idx, text in
-                RecipeStepDTO(id: UUID(), recipeId: recipeId, order: idx + 1, instruction: text)
-            }
+            return row.steps_list ?? []
         } catch {
             self.error = error.localizedDescription
             return []
+        }
+    }
+
+    /// Zwraca kroki przepisu posortowane po `order`.
+    @MainActor
+    func steps(for recipeId: UUID) async -> [RecipeStepDTO] {
+        let texts = await rawSteps(for: recipeId)
+        return texts.enumerated().map { idx, text in
+            RecipeStepDTO(id: UUID(), recipeId: recipeId, order: idx + 1, instruction: text)
         }
     }
 }
