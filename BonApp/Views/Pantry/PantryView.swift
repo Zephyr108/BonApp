@@ -46,12 +46,13 @@ final class PantryScreenViewModel: ObservableObject {
         error = nil
         defer { isLoading = false }
         do {
-            guard let uid = userId, !uid.isEmpty else { self.pantryItems = []; return }
+            guard let uidStr = userId, let uid = UUID(uuidString: uidStr) else { self.pantryItems = []; return }
             let rows: [PantryItemRow] = try await client
                 .from("pantry")
                 .select("id,product_id,quantity,product:product_id(id,name,product_category_id)")
-                .eq("user_id", value: uid)
+                .eq("user_id", value: uid) // compare as UUID to avoid type mismatch stalls
                 .order("id", ascending: true)
+                .limit(500)
                 .execute()
                 .value
             self.pantryItems = rows

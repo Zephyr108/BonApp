@@ -67,6 +67,7 @@ final class PantryViewModel: ObservableObject {
     }
 
     // MARK: - Add
+    @MainActor
     func addItem(productId: Int, quantity: Double) async {
         struct InsertPayload: Encodable { let user_id: String; let product_id: Int; let quantity: Double }
         let payload = InsertPayload(user_id: userId, product_id: productId, quantity: quantity)
@@ -79,6 +80,7 @@ final class PantryViewModel: ObservableObject {
     }
 
     // MARK: - Update
+    @MainActor
     func updateItem(id: UUID, productId: Int, quantity: Double) async {
         struct UpdatePayload: Encodable { let product_id: Int; let quantity: Double }
         let payload = UpdatePayload(product_id: productId, quantity: quantity)
@@ -96,6 +98,7 @@ final class PantryViewModel: ObservableObject {
     }
 
     // MARK: - Delete
+    @MainActor
     func deleteItem(id: UUID) async {
         do {
             _ = try await client

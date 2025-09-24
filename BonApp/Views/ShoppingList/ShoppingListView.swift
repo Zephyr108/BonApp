@@ -50,6 +50,8 @@ struct ShoppingListView: View {
             .listStyle(.plain)
             .background(Color("background").ignoresSafeArea())
             .navigationTitle("Lista zakupów")
+            .task { await viewModel.fetchItems() }
+            .refreshable { await viewModel.fetchItems() }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { isShowingAdd = true }) {

@@ -188,3 +188,91 @@ final class ShoppingListViewModel: ObservableObject {
     // MARK: - Refresh
     func refresh() async { await fetchItems() }
 }
+
+// MARK: - Shopping lists (containers) – for the screen that shows user's lists
+
+struct ShoppingListDTO: Identifiable, Hashable, Decodable {
+    let id: UUID
+    let name: String
+    let userId: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, name
+        case userId = "user_id"
+    }
+}
+
+private struct ShoppingListInsert: Encodable {
+    let name: String
+    let user_id: String
+}
+
+final class ShoppingListsViewModel: ObservableObject {
+    @Published var lists: [ShoppingListDTO] = []
+    @Published var isLoading = false
+    @Published var error: String? = nil
+
+    private let client = SupabaseManager.shared.client
+    private let userId: String
+
+    init(ownerId: String) {
+        self.userId = ownerId
+        Task { await fetchLists() }
+    }
+
+    // MARK: - Fetch lists
+    @MainActor
+    func fetchLists() async {
+        guard !isLoading else { return }
+        isLoading = true
+        error = nil
+        defer { isLoading = false }
+
+        do {
+            let rows: [ShoppingListDTO] = try await client
+                .from("shopping_list")
+                .select("id,name,user_id")
+                .eq("user_id", value: userId)
+                .order("name", ascending: true)
+                .execute()
+                .value
+            self.lists = rows
+        } catch {
+            self.error = error.localizedDescription
+            self.lists = []
+        }
+    }
+
+    // MARK: - Create list
+    func createList(name: String) async {
+        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let payload = ShoppingListInsert(name: name, user_id: userId)
+        do {
+            _ = try await client
+                .from("shopping_list")
+                .insert(payload)
+                .execute()
+            await fetchLists()
+        } catch {
+            await MainActor.run { self.error = error.localizedDescription }
+        }
+    }
+
+    // MARK: - Delete list
+    func deleteList(id: UUID) async {
+        do {
+            _ = try await client
+                .from("shopping_list")
+                .delete()
+                .eq("id", value: id)
+                .eq("user_id", value: userId)
+                .execute()
+            await fetchLists()
+        } catch {
+            await MainActor.run { self.error = error.localizedDescription }
+        }
+    }
+
+    // MARK: - Refresh
+    func refresh() async { await fetchLists() }
+}
