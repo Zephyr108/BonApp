@@ -2,8 +2,6 @@
 //  AddRecipeView.swift
 //  BonApp
 //
-//  Migrated to Supabase (no Core Data)
-//
 
 import SwiftUI
 import Supabase
@@ -12,19 +10,12 @@ import UIKit
 private struct RecipeInsertPayload: Encodable {
     let id: UUID
     let title: String
-    let detail: String
-    let is_public: Bool
-    let cook_time: Int
-    let image_url: String?
-    let user_id: String
-    let ingredients: [String]
-}
-
-private struct StepInsertPayload: Encodable {
-    let id: UUID
-    let recipe_id: UUID
-    let order: Int
-    let instruction: String
+    let description: String
+    let prepare_time: Int
+    let steps_list: [String]
+    let visibility: Bool
+    let photo: String?
+    let user_id: UUID
 }
 
 struct AddRecipeView: View {
@@ -113,21 +104,6 @@ struct AddRecipeView: View {
                     .padding(.bottom, 12)
 
                     Group {
-                        Text("Składniki (oddzielone przecinkami)")
-                            .font(.headline)
-                            .foregroundColor(Color("textSecondary"))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-
-                        TextField("Składniki", text: $ingredientsText)
-                            .foregroundColor(Color("textPrimary"))
-                            .padding(16)
-                            .background(Color("textfieldBackground"))
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
-                            .cornerRadius(8)
-                    }
-                    .padding(.bottom, 12)
-
-                    Group {
                         Text("Czas przygotowania (minuty)")
                             .font(.headline)
                             .foregroundColor(Color("textSecondary"))
@@ -199,13 +175,19 @@ struct AddRecipeView: View {
 
     private var canSave: Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !ingredientsText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         Int(cookTime.trimmingCharacters(in: .whitespacesAndNewlines)) != nil
     }
 
     private func saveRecipe() async {
-        guard let userId = auth.currentUser?.id else {
-            await MainActor.run { errorMessage = "Brak zalogowanego użytkownika." }
+        // Prefer ID from loaded profile, but fall back to Auth session if profile isn't loaded yet
+        var userUUID: UUID?
+        if let idStr = auth.currentUser?.id, let u = UUID(uuidString: idStr) {
+            userUUID = u
+        } else if let session = try? await SupabaseManager.shared.client.auth.session {
+            userUUID = session.user.id
+        }
+        guard let ownerId = userUUID else {
+            await MainActor.run { errorMessage = "Brak lub niepoprawne ID zalogowanego użytkownika." }
             return
         }
         isSaving = true
@@ -215,55 +197,35 @@ struct AddRecipeView: View {
         let client = SupabaseManager.shared.client
         let recipeId = UUID()
         let cookTimeInt = Int(cookTime.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
-        let ingredientsArray = ingredientsText
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
 
         do {
             // 1) Upload image if provided
             var imageURL: String? = nil
             if let img = selectedImage, let data = img.jpegData(compressionQuality: 0.85) {
-                let path = "\(userId)/recipes/\(recipeId).jpg"
+                let path = "\(ownerId.uuidString)/recipes/\(recipeId).jpg"
                 _ = try await client.storage
-                    .from("recipes")
-                    .upload(path, data: data, options: FileOptions(cacheControl: "3600", contentType: "image/jpeg", upsert: true))
+                    .from("recipe-images")
+                    .upload(path: path, file: data, options: FileOptions(cacheControl: "3600", contentType: "image/jpeg", upsert: true))
                 // Public URL (assuming bucket is public). If not public, you can create a signed URL.
-                imageURL = try client.storage.from("recipes").getPublicURL(path: path).absoluteString
+                imageURL = try client.storage.from("recipe-images").getPublicURL(path: path).absoluteString
             }
 
-            // 2) Insert recipe
+            // 2) Insert recipe (steps kept as a JSONB list)
             let recipeInsert = RecipeInsertPayload(
                 id: recipeId,
                 title: title,
-                detail: detail,
-                is_public: isPublic,
-                cook_time: cookTimeInt,
-                image_url: imageURL,
-                user_id: userId,
-                ingredients: ingredientsArray
+                description: detail,
+                prepare_time: cookTimeInt,
+                steps_list: stepTexts,
+                visibility: isPublic,
+                photo: imageURL,
+                user_id: ownerId
             )
 
             _ = try await client
                 .from("recipe")
                 .insert(recipeInsert)
                 .execute()
-
-            // 3) Insert steps (if any)
-            if !stepTexts.isEmpty {
-                let stepsPayload: [StepInsertPayload] = stepTexts.enumerated().map { (index, text) in
-                    StepInsertPayload(
-                        id: UUID(),
-                        recipe_id: recipeId,
-                        order: index + 1,
-                        instruction: text
-                    )
-                }
-                _ = try await client
-                    .from("recipe_steps")
-                    .insert(stepsPayload)
-                    .execute()
-            }
 
             await MainActor.run { dismiss() }
         } catch {
