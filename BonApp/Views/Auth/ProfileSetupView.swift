@@ -117,7 +117,6 @@ struct ProfileSetupView: View {
         if name.isEmpty { name = u.first_name ?? "" }
         if preferences.isEmpty { preferences = u.preferences ?? "" }
         if email.isEmpty { email = u.email }
-        // Avatar color is stored locally for now; if you later add it to the profile, load it here.
     }
 
     private func saveProfile() {

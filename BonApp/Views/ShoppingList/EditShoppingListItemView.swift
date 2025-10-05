@@ -2,22 +2,20 @@ import SwiftUI
 import Supabase
 
 struct EditShoppingListItemView: View {
-    let itemId: UUID
-    let initialProductId: Int?
+    let shoppingListId: UUID
+    let initialProductId: Int
     let initialQuantity: Double
 
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject var auth: AuthViewModel
 
-    @State private var selectedProductId: Int?
+    @State private var selectedProductId: Int
     @State private var quantity: String
     @State private var products: [ProductRow] = []
     @State private var isSaving = false
     @State private var isLoading = false
-    @State private var editingProduct: ProductRow?
 
-    init(itemId: UUID, productId: Int? = nil, quantity: Double = 1.0) {
-        self.itemId = itemId
+    init(shoppingListId: UUID, productId: Int, quantity: Double = 1.0) {
+        self.shoppingListId = shoppingListId
         self.initialProductId = productId
         self.initialQuantity = quantity
         _selectedProductId = State(initialValue: productId)
@@ -34,7 +32,7 @@ struct EditShoppingListItemView: View {
                             .foregroundColor(Color("textPrimary"))
                         Picker("Wybierz produkt", selection: $selectedProductId) {
                             ForEach(products) { product in
-                                Text(product.name).tag(Optional(product.id))
+                                Text(product.name).tag(product.id)
                             }
                         }
                         .pickerStyle(MenuPickerStyle())
@@ -62,67 +60,67 @@ struct EditShoppingListItemView: View {
                     .background(isSaving ? Color("textfieldBorder") : Color("edit"))
                     .foregroundColor(Color("buttonText"))
                     .cornerRadius(8)
-                    .disabled(isSaving || selectedProductId == nil || quantity.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(isSaving || quantity.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
                 .frame(maxHeight: .infinity, alignment: .top)
                 .padding()
             }
             .navigationTitle("Edytuj pozycję listy zakupów")
             .navigationBarTitleDisplayMode(.inline)
-            .task { await loadProductsAndItem() }
+            .task { await loadProducts() }
         }
     }
 
-    private func loadProductsAndItem() async {
+    private func loadProducts() async {
         isLoading = true
         defer { isLoading = false }
         do {
-            // Load products
             let rows: [ProductRow] = try await SupabaseManager.shared.client
-                .from("products")
+                .from("product")
                 .select("id,name,product_category_id")
-                .order("name")
+                .order("name", ascending: true)
                 .execute()
                 .value
             self.products = rows
-
-            // Load the shopping list item (with embedded product data)
-            let client = SupabaseManager.shared.client
-            let userId = auth.currentUser?.id ?? ""
-            let query = client
-                .from("shopping_list")
-                .select("product_id,quantity,product:products(id,name,product_category_id)")
-                .eq("id", value: itemId)
-                .eq("user_id", value: userId)
-                .limit(1)
-            let items: [ShoppingListItemRow] = try await query.execute().value
-            if let item = items.first {
-                self.selectedProductId = item.product_id
-                self.quantity = String(item.quantity)
-                self.editingProduct = item.product
-            }
         } catch {
-            print("Błąd ładowania danych: \(error.localizedDescription)")
+            print("Błąd ładowania produktów: \(error.localizedDescription)")
         }
     }
 
     private func saveChanges() {
-        guard let pid = selectedProductId else { return }
+        let pid = selectedProductId
         let qty = Double(quantity.replacingOccurrences(of: ",", with: ".")) ?? 1.0
         isSaving = true
         Task {
             defer { isSaving = false }
             do {
                 let client = SupabaseManager.shared.client
-                let userId = auth.currentUser?.id ?? ""
-                struct UpdatePayload: Encodable { let product_id: Int; let quantity: Double }
-                let payload = UpdatePayload(product_id: pid, quantity: qty)
-                _ = try await client
-                    .from("shopping_list")
-                    .update(payload)
-                    .eq("id", value: itemId)
-                    .eq("user_id", value: userId)
-                    .execute()
+
+                struct ProductOnListInsert: Encodable { let shopping_list_id: UUID; let product_id: Int; let count: Double; let is_bought: Bool }
+                struct ProductOnListUpdate: Encodable { let count: Double?; let is_bought: Bool? }
+
+                if pid != initialProductId {
+                    // Change of product: delete old row and insert a new one
+                    _ = try await client
+                        .from("product_on_list")
+                        .delete()
+                        .eq("shopping_list_id", value: shoppingListId)
+                        .eq("product_id", value: initialProductId)
+                        .execute()
+
+                    let insertPayload = ProductOnListInsert(shopping_list_id: shoppingListId, product_id: pid, count: qty, is_bought: false)
+                    _ = try await client.from("product_on_list").insert(insertPayload).execute()
+                } else {
+                    // Same product: just update the count
+                    let updatePayload = ProductOnListUpdate(count: qty, is_bought: nil)
+                    _ = try await client
+                        .from("product_on_list")
+                        .update(updatePayload)
+                        .eq("shopping_list_id", value: shoppingListId)
+                        .eq("product_id", value: pid)
+                        .execute()
+                }
+
                 dismiss()
             } catch {
                 print("Błąd zapisu pozycji listy zakupów: \(error.localizedDescription)")
@@ -137,17 +135,8 @@ private struct ProductRow: Decodable, Identifiable {
     let product_category_id: Int?
 }
 
-private struct ShoppingListItemRow: Decodable {
-    let product_id: Int
-    let quantity: Double
-    let product: ProductRow?
-}
-
-struct EditShoppingListItemView_Previews: PreviewProvider {
-    static var previews: some View {
-        NavigationStack {
-            EditShoppingListItemView(itemId: UUID(), productId: 1, quantity: 2.0)
-                .environmentObject(AuthViewModel())
-        }
+#Preview {
+    NavigationStack {
+        EditShoppingListItemView(shoppingListId: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!, productId: 1, quantity: 2.0)
     }
 }

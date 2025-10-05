@@ -49,12 +49,15 @@ struct AddShoppingListItemView: View {
                 .task {
                     do {
                         let rows: [ProductRow] = try await SupabaseManager.shared.client
-                            .from("products")
+                            .from("product")
                             .select("id,name,product_category_id")
-                            .order("name")
+                            .order("name", ascending: true)
                             .execute()
                             .value
                         self.products = rows
+                        if self.selectedProductId == nil {
+                            self.selectedProductId = self.products.first?.id
+                        }
                     } catch {
                         print("Failed to load products: \(error.localizedDescription)")
                     }

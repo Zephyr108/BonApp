@@ -2,8 +2,6 @@
 //  AuthViewModel.swift
 //  BonApp
 //
-//  Migrated to Supabase Auth
-//
 
 import Foundation
 import Combine
@@ -77,7 +75,7 @@ final class AuthViewModel: ObservableObject {
         // Load session/user at startup
         Task { await refreshAuthState() }
     }
-
+/*
     // MARK: - Registration (legacy, uses metadata)
     func register() {
         errorMessage = nil
@@ -120,7 +118,7 @@ final class AuthViewModel: ObservableObject {
             }
         }
     }
-
+*/
     // MARK: - Registration (users table aware)
     @MainActor
     func register(email: String,

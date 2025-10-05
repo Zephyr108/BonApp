@@ -25,7 +25,7 @@ struct ContentView: View {
                         .tabItem { Label("Spiżarnia", systemImage: "tray.fill") }
                         .tag(Tab.pantry)
 
-                    ShoppingListView(ownerId: user.id)
+                    ShoppingListsView(ownerId: user.id)
                         .tabItem { Label("Zakupy", systemImage: "cart.fill") }
                         .tag(Tab.shopping)
                 } else {

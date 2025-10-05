@@ -3,20 +3,21 @@ import Supabase
 
 // MARK: - DTOs
 struct ShoppingListItemDTO: Identifiable, Hashable, Decodable {
-    let id: UUID
+    // product_on_list based item (no row id in table)
     let productId: Int
-    let quantity: Double
+    let count: Double
     let isBought: Bool
-    let userId: String
+    let shoppingListId: UUID
     let productName: String
     let productCategoryId: Int?
+    // Synthesized identifier (per list product)
+    var id: String { "\(shoppingListId.uuidString)-\(productId)" }
 
     private enum CodingKeys: String, CodingKey {
-        case id
         case productId = "product_id"
-        case quantity
+        case count
         case isBought = "is_bought"
-        case userId = "user_id"
+        case shoppingListId = "shopping_list_id"
         case product
     }
 
@@ -24,30 +25,27 @@ struct ShoppingListItemDTO: Identifiable, Hashable, Decodable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = try c.decode(UUID.self, forKey: .id)
         productId = try c.decode(Int.self, forKey: .productId)
-        quantity = try c.decode(Double.self, forKey: .quantity)
+        count = try c.decode(Double.self, forKey: .count)
         isBought = try c.decode(Bool.self, forKey: .isBought)
-        userId = try c.decode(String.self, forKey: .userId)
+        shoppingListId = try c.decode(UUID.self, forKey: .shoppingListId)
         let p = try c.decode(ProductEmbed.self, forKey: .product)
         productName = p.name
         productCategoryId = p.product_category_id
     }
 }
 
-private struct ShoppingInsert: Encodable {
-    let user_id: String
+private struct ProductOnListInsert: Encodable {
+    let shopping_list_id: UUID
     let product_id: Int
-    let quantity: Double
+    let count: Double
     let is_bought: Bool
 }
 
-private struct ShoppingUpdate: Encodable {
-    let product_id: Int
-    let quantity: Double
+private struct ProductOnListUpdate: Encodable {
+    let count: Double?
+    let is_bought: Bool?
 }
-
-private struct BoughtUpdate: Encodable { let is_bought: Bool }
 
 private struct PantryInsert: Encodable {
     let user_id: String
@@ -62,10 +60,12 @@ final class ShoppingListViewModel: ObservableObject {
 
     private let client = SupabaseManager.shared.client
     private let userId: String
+    private let shoppingListId: UUID
 
     // MARK: - Init
-    init(ownerId: String) { // keep external API stable
+    init(ownerId: String, shoppingListId: UUID) { // now bound to a specific list
         self.userId = ownerId
+        self.shoppingListId = shoppingListId
         Task { await fetchItems() }
     }
 
@@ -79,11 +79,12 @@ final class ShoppingListViewModel: ObservableObject {
 
         do {
             let rows: [ShoppingListItemDTO] = try await client
-                .from("shopping_list")
-                .select("id,product_id,quantity,is_bought,user_id,product:product_id(id,name,product_category_id)")
-                .eq("user_id", value: userId)
+                .from("product_on_list")
+                .select("product_id,count,is_bought,shopping_list_id,product:product_id(id,name,product_category_id),shopping_list!inner(id,user_id)")
+                .eq("shopping_list_id", value: shoppingListId)
+                .eq("shopping_list.user_id", value: userId)
                 .order("is_bought", ascending: true)
-                .order("id", ascending: true)
+                .order("product_id", ascending: true)
                 .execute()
                 .value
             self.items = rows
@@ -95,9 +96,30 @@ final class ShoppingListViewModel: ObservableObject {
 
     // MARK: - Add
     func addItem(productId: Int, quantity: Double) async {
-        let payload = ShoppingInsert(user_id: userId, product_id: productId, quantity: quantity, is_bought: false)
         do {
-            _ = try await client.from("shopping_list").insert(payload).execute()
+            struct Existing: Decodable { let count: Double }
+            let existing: [Existing] = try await client
+                .from("product_on_list")
+                .select("count")
+                .eq("shopping_list_id", value: shoppingListId)
+                .eq("product_id", value: productId)
+                .limit(1)
+                .execute()
+                .value
+
+            if let row = existing.first {
+                let newCount = row.count + quantity
+                let payload = ProductOnListUpdate(count: newCount, is_bought: nil)
+                _ = try await client
+                    .from("product_on_list")
+                    .update(payload)
+                    .eq("shopping_list_id", value: shoppingListId)
+                    .eq("product_id", value: productId)
+                    .execute()
+            } else {
+                let payload = ProductOnListInsert(shopping_list_id: shoppingListId, product_id: productId, count: quantity, is_bought: false)
+                _ = try await client.from("product_on_list").insert(payload).execute()
+            }
             await fetchItems()
         } catch {
             await MainActor.run { self.error = error.localizedDescription }
@@ -105,14 +127,14 @@ final class ShoppingListViewModel: ObservableObject {
     }
 
     // MARK: - Update
-    func updateItem(id: UUID, productId: Int, quantity: Double) async {
-        let payload = ShoppingUpdate(product_id: productId, quantity: quantity)
+    func updateItem(productId: Int, quantity: Double) async {
+        let payload = ProductOnListUpdate(count: quantity, is_bought: nil)
         do {
             _ = try await client
-                .from("shopping_list")
+                .from("product_on_list")
                 .update(payload)
-                .eq("id", value: id)
-                .eq("user_id", value: userId)
+                .eq("shopping_list_id", value: shoppingListId)
+                .eq("product_id", value: productId)
                 .execute()
             await fetchItems()
         } catch {
@@ -121,13 +143,13 @@ final class ShoppingListViewModel: ObservableObject {
     }
 
     // MARK: - Delete
-    func deleteItem(id: UUID) async {
+    func deleteItem(productId: Int) async {
         do {
             _ = try await client
-                .from("shopping_list")
+                .from("product_on_list")
                 .delete()
-                .eq("id", value: id)
-                .eq("user_id", value: userId)
+                .eq("shopping_list_id", value: shoppingListId)
+                .eq("product_id", value: productId)
                 .execute()
             await fetchItems()
         } catch {
@@ -136,13 +158,13 @@ final class ShoppingListViewModel: ObservableObject {
     }
 
     // MARK: - Mark as bought
-    func markAsBought(id: UUID) async {
+    func markAsBought(productId: Int) async {
         do {
             _ = try await client
-                .from("shopping_list")
-                .update(BoughtUpdate(is_bought: true))
-                .eq("id", value: id)
-                .eq("user_id", value: userId)
+                .from("product_on_list")
+                .update(ProductOnListUpdate(count: nil, is_bought: true))
+                .eq("shopping_list_id", value: shoppingListId)
+                .eq("product_id", value: productId)
                 .execute()
             await fetchItems()
         } catch {
@@ -153,30 +175,26 @@ final class ShoppingListViewModel: ObservableObject {
     // MARK: - Transfer bought items to pantry
     func transferBoughtItemsToPantry() async {
         do {
-            struct Row: Decodable { let id: UUID; let product_id: Int; let quantity: Double }
+            struct Row: Decodable { let product_id: Int; let count: Double }
             let rows: [Row] = try await client
-                .from("shopping_list")
-                .select("id,product_id,quantity")
-                .eq("user_id", value: userId)
+                .from("product_on_list")
+                .select("product_id,count")
+                .eq("shopping_list_id", value: shoppingListId)
                 .eq("is_bought", value: true)
                 .execute()
                 .value
             guard !rows.isEmpty else { return }
 
             let pantryPayload: [PantryInsert] = rows.map { r in
-                PantryInsert(user_id: userId, product_id: r.product_id, quantity: r.quantity)
+                PantryInsert(user_id: userId, product_id: r.product_id, quantity: r.count)
             }
-            _ = try await client
-                .from("pantry")
-                .insert(pantryPayload)
-                .execute()
+            _ = try await client.from("pantry").insert(pantryPayload).execute()
 
-            let ids = rows.map { $0.id }
             _ = try await client
-                .from("shopping_list")
+                .from("product_on_list")
                 .delete()
-                .in("id", values: ids)
-                .eq("user_id", value: userId)
+                .eq("shopping_list_id", value: shoppingListId)
+                .eq("is_bought", value: true)
                 .execute()
 
             await fetchItems()
@@ -261,6 +279,13 @@ final class ShoppingListsViewModel: ObservableObject {
     // MARK: - Delete list
     func deleteList(id: UUID) async {
         do {
+            // Remove child rows first to satisfy FK constraints
+            _ = try await client
+                .from("product_on_list")
+                .delete()
+                .eq("shopping_list_id", value: id)
+                .execute()
+
             _ = try await client
                 .from("shopping_list")
                 .delete()
