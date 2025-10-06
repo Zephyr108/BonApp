@@ -3,7 +3,6 @@ import SwiftUI
 struct ShoppingListDetailView: View {
     @StateObject private var viewModel: ShoppingListViewModel
 
-    // Add / Edit sheet state
     @State private var isPresentingSheet = false
     @State private var isEditing = false
     @State private var inputProductId: String = ""

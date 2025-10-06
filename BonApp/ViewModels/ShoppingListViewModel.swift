@@ -3,14 +3,12 @@ import Supabase
 
 // MARK: - DTOs
 struct ShoppingListItemDTO: Identifiable, Hashable, Decodable {
-    // product_on_list based item (no row id in table)
     let productId: Int
     let count: Double
     let isBought: Bool
     let shoppingListId: UUID
     let productName: String
     let productCategoryId: Int?
-    // Synthesized identifier (per list product)
     var id: String { "\(shoppingListId.uuidString)-\(productId)" }
 
     private enum CodingKeys: String, CodingKey {
@@ -63,7 +61,7 @@ final class ShoppingListViewModel: ObservableObject {
     private let shoppingListId: UUID
 
     // MARK: - Init
-    init(ownerId: String, shoppingListId: UUID) { // now bound to a specific list
+    init(ownerId: String, shoppingListId: UUID) {
         self.userId = ownerId
         self.shoppingListId = shoppingListId
         Task { await fetchItems() }
