@@ -5,8 +5,8 @@ struct ContentView: View {
     @State private var selectedTab: Tab = .recipes
     @EnvironmentObject var auth: AuthViewModel
 
-    // Treat user as logged-in if either the flag is true or we already have a user row
-    private var isLoggedInStable: Bool { auth.isAuthenticated || auth.currentUser != nil }
+    // Consider the user logged-in as soon as auth says so (profile row may load later)
+    private var isLoggedInStable: Bool { auth.isAuthenticated }
 
     // Avoid flicker: until we refresh auth once, show placeholders instead of logged-out UI
     @State private var bootstrapped = false
@@ -15,33 +15,44 @@ struct ContentView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
+            // 1) Recipes — always visible
             RecipeListView()
                 .tabItem { Label("Przepisy", systemImage: "book") }
                 .tag(Tab.recipes)
 
-            if isLoggedInStable {
-                if let user = currentUser {
+            // 2) Pantry — tab is always present; content depends on auth
+            Group {
+                if isLoggedInStable {
                     PantryView()
-                        .tabItem { Label("Spiżarnia", systemImage: "tray.fill") }
-                        .tag(Tab.pantry)
-
-                    ShoppingListsView(ownerId: user.id)
-                        .tabItem { Label("Zakupy", systemImage: "cart.fill") }
-                        .tag(Tab.shopping)
+                } else if !bootstrapped {
+                    ProgressView()
                 } else {
-                    ProgressView().tabItem { Label("Spiżarnia", systemImage: "tray.fill") }.tag(Tab.pantry)
-                    ProgressView().tabItem { Label("Zakupy", systemImage: "cart.fill") }.tag(Tab.shopping)
-                }
-            } else {
-                if !bootstrapped {
-                    ProgressView().tabItem { Label("Spiżarnia", systemImage: "tray.fill") }.tag(Tab.pantry)
-                    ProgressView().tabItem { Label("Zakupy", systemImage: "cart.fill") }.tag(Tab.shopping)
-                } else {
-                    EmptyView().tabItem { Label("Spiżarnia", systemImage: "tray.fill") }.tag(Tab.pantry)
-                    EmptyView().tabItem { Label("Zakupy", systemImage: "cart.fill") }.tag(Tab.shopping)
+                    EmptyView()
                 }
             }
+            .tabItem { Label("Spiżarnia", systemImage: "tray.fill") }
+            .tag(Tab.pantry)
 
+            // 3) Shopping — tab is always present; content depends on auth
+            Group {
+                if isLoggedInStable {
+                    if let ownerId = currentUser?.id { // only pass a valid UUID string
+                        ShoppingListsView(ownerId: ownerId)
+                    } else if !bootstrapped {
+                        ProgressView()
+                    } else {
+                        ContentUnavailableView("Brak profilu", systemImage: "person.fill.questionmark", description: Text("Zaloguj się ponownie lub odśwież profil."))
+                    }
+                } else if !bootstrapped {
+                    ProgressView()
+                } else {
+                    EmptyView()
+                }
+            }
+            .tabItem { Label("Zakupy", systemImage: "cart.fill") }
+            .tag(Tab.shopping)
+
+            // 4) Account — always visible
             NavigationStack {
                 accountContent
                     .navigationTitle("Konto")

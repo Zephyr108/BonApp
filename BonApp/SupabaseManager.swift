@@ -22,8 +22,7 @@ final class SupabaseManager {
         sessionConfig.timeoutIntervalForResource = 120
         sessionConfig.requestCachePolicy = .reloadIgnoringLocalCacheData
 
-        _ = URLSession(configuration: sessionConfig) // kept to document tuned session; SDK uses its own session
-
+        _ = URLSession(configuration: sessionConfig)
         self.client = SupabaseClient(
             supabaseURL: supabaseURL,
             supabaseKey: supabaseKey

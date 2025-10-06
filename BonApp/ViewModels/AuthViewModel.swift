@@ -75,50 +75,7 @@ final class AuthViewModel: ObservableObject {
         // Load session/user at startup
         Task { await refreshAuthState() }
     }
-/*
-    // MARK: - Registration (legacy, uses metadata)
-    func register() {
-        errorMessage = nil
 
-        guard Validators.isValidEmail(email) else {
-            errorMessage = "InvalidEmail"
-            return
-        }
-        guard Validators.isValidPassword(password) else {
-            errorMessage = "WeakPassword"
-            return
-        }
-        guard Validators.isNonEmpty(name) else {
-            errorMessage = "Name cannot be empty"
-            return
-        }
-
-        Task { @MainActor in
-            do {
-                // Attach initial metadata (name, prefs)
-                let metadata: [String: AnyJSON] = [
-                    "name": .string(name),
-                    "preferences": preferences.isEmpty ? .null : .string(preferences)
-                ]
-
-                _ = try await client.auth.signUp(
-                    email: email,
-                    password: password,
-                    data: metadata
-                )
-
-                // After sign up, depending on your project settings, user may need to confirm email.
-                // We refresh state; if a session exists, user is authenticated.
-                await refreshAuthState()
-                if !isAuthenticated {
-                    errorMessage = "Check your email to confirm the account."
-                }
-            } catch {
-                self.errorMessage = "Registration failed: \(error.localizedDescription)"
-            }
-        }
-    }
-*/
     // MARK: - Registration (users table aware)
     @MainActor
     func register(email: String,
@@ -235,27 +192,10 @@ final class AuthViewModel: ObservableObject {
     }
 
 
-    // MARK: - Login
-    func login() {
-        errorMessage = nil
-
-        guard Validators.isValidEmail(email) else {
-            errorMessage = "InvalidEmail"
-            return
-        }
-        guard !password.isEmpty else {
-            errorMessage = "Password cannot be empty"
-            return
-        }
-
-        Task { @MainActor in
-            do {
-                _ = try await client.auth.signIn(email: email, password: password)
-                await refreshAuthState()
-            } catch {
-                self.errorMessage = "Invalid email or password"
-            }
-        }
+    // MARK: - Login (legacy wrapper)
+    @available(*, deprecated, message: "Use async login() instead")
+    func loginLegacy() {
+        Task { await self.login() }
     }
 
     // MARK: - Login (async with retry)
@@ -302,18 +242,7 @@ final class AuthViewModel: ObservableObject {
     // MARK: - Logout (async)
     @MainActor
     func logout() async {
-        do {
-            try await client.auth.signOut()
-        } catch {
-            // Even if signOut throws (network), clear local state
-            print("Sign out error: \(error.localizedDescription)")
-        }
-        self.isAuthenticated = false
-        self.currentUser = nil
-        self.email = ""
-        self.password = ""
-        self.name = ""
-        self.preferences = ""
+        await signOut()
     }
 
     /// Async sign-out API used by UI (ContentView). Non-throwing.
