@@ -62,8 +62,12 @@ final class RecipeListViewModel: ObservableObject {
 
             // 3) Rozdziel na sekcje
             if let uid = effectiveUid, !uid.isEmpty {
-                self.myRecipes = rows.filter { $0.authorId == uid }
-                self.otherRecipes = rows.filter { $0.isPublic && $0.authorId != uid }
+                let u = uid.lowercased()
+                self.myRecipes = rows.filter { $0.authorId.lowercased() == u }
+                self.otherRecipes = rows.filter { $0.isPublic && $0.authorId.lowercased() != u }
+                #if DEBUG
+                print("📦 recipes: total=\(rows.count), mine=\(self.myRecipes.count), others=\(self.otherRecipes.count)")
+                #endif
 
                 // 4) Wczytaj ulubione
                 struct FavRow: Decodable { let recipe_id: UUID }

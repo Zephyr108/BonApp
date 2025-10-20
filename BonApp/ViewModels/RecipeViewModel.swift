@@ -70,6 +70,8 @@ final class RecipeViewModel: ObservableObject {
     @Published var recipes: [RecipeDTO] = []
     @Published var isLoading: Bool = false
     @Published var error: String? = nil
+    @Published var myRecipes: [RecipeDTO] = []
+    @Published var otherRecipes: [RecipeDTO] = []
 
     private let client = SupabaseManager.shared.client
     private let currentUserId: String?
@@ -121,6 +123,15 @@ final class RecipeViewModel: ObservableObject {
             for r in publicRows { merged[r.id] = r }
             for r in mineRows { merged[r.id] = r }
             let result = merged.values.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+
+            // Split into sections for the UI
+            if let uid = uid, !uid.isEmpty {
+                self.myRecipes = result.filter { $0.user_id == uid }
+                self.otherRecipes = result.filter { $0.visibility && $0.user_id != uid }
+            } else {
+                self.myRecipes = []
+                self.otherRecipes = result.filter { $0.visibility }
+            }
 
             self.recipes = result
             self.error = nil

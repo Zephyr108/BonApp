@@ -129,9 +129,17 @@ struct RecipeListView: View {
             .navigationDestination(for: RecipeListItem.self) { recipe in
                 destination(for: recipe)
             }
-            .task { await viewModel.refresh(currentUserId: auth.currentUser?.id) }
+            .task {
+                let uid = await auth.resolveActiveUserId()
+                print("Active UID:", uid ?? "nil")
+                await viewModel.refresh(currentUserId: uid)
+            }
             .onChange(of: auth.currentUser?.id, initial: false) { _, _ in
-                Task { await viewModel.refresh(currentUserId: auth.currentUser?.id) }
+                Task {
+                    let uid = await auth.resolveActiveUserId()
+                    print("UID changed →", uid ?? "nil")
+                    await viewModel.refresh(currentUserId: uid)
+                }
             }
         }
     }
