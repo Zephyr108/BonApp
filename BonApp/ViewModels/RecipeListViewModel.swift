@@ -35,13 +35,30 @@ final class RecipeListViewModel: ObservableObject {
                 }
             }
 
-            // 2) Pobierz minimalny zestaw kolumn (RLS: publiczne + moje)
-            let rows: [RecipeListItem] = try await client
+            // Pobierz publiczne i (jeśli znamy uid) także moje; potem scal i posortuj
+            let publicRows: [RecipeListItem] = try await client
                 .from("recipe")
                 .select("id,title,description,prepare_time,photo,visibility,user_id")
+                .eq("visibility", value: true)
                 .order("title", ascending: true)
                 .execute()
                 .value
+
+            var mineRows: [RecipeListItem] = []
+            if let uid = effectiveUid, !uid.isEmpty {
+                mineRows = try await client
+                    .from("recipe")
+                    .select("id,title,description,prepare_time,photo,visibility,user_id")
+                    .eq("user_id", value: uid)
+                    .order("title", ascending: true)
+                    .execute()
+                    .value
+            }
+
+            var dict: [UUID: RecipeListItem] = [:]
+            for r in publicRows { dict[r.id] = r }
+            for r in mineRows { dict[r.id] = r }
+            let rows = dict.values.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
 
             // 3) Rozdziel na sekcje
             if let uid = effectiveUid, !uid.isEmpty {

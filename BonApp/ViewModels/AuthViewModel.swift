@@ -67,6 +67,9 @@ final class AuthViewModel: ObservableObject {
     @Published var isLoading: Bool = false
     @Published private(set) var isRefreshingAuth: Bool = false
 
+    /// Cached/cheap accessor: returns the user id if `currentUser` is already loaded; otherwise nil.
+    var activeUserId: String? { currentUser?.id }
+
     private let client: SupabaseClient
     private var cancellables = Set<AnyCancellable>()
 
@@ -320,6 +323,14 @@ final class AuthViewModel: ObservableObject {
             // Network/temporary problems – do not flip to logged-out state
             print("[Auth] refreshAuthState error:", error.localizedDescription)
         }
+    }
+
+    /// Resolve the active user id. If the profile row hasn't loaded yet, falls back to the Supabase Auth user id.
+    @MainActor
+    func resolveActiveUserId() async -> String? {
+        if let id = currentUser?.id { return id }
+        if let user = try? await client.auth.user() { return user.id.uuidString }
+        return nil
     }
 
     // MARK: - Backwards-compat shim (no-op)
