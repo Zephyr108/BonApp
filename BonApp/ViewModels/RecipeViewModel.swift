@@ -87,20 +87,43 @@ final class RecipeViewModel: ObservableObject {
         error = nil
         defer { isLoading = false }
         do {
-            let rows: [RecipeDTO] = try await client
+            // 1) Resolve current user id (injected or from auth session)
+            var uid: String? = currentUserId
+            if uid == nil {
+                if let session = try? await client.auth.session {
+                    uid = session.user.id.uuidString
+                }
+            }
+
+            // 2) Load public recipes
+            let publicRows: [RecipeDTO] = try await client
                 .from("recipe")
                 .select("id,title,description,prepare_time,photo,visibility,user_id")
+                .eq("visibility", value: true)
                 .order("title", ascending: true)
                 .execute()
                 .value
 
-            if let uid = currentUserId {
-                // Pokaż moje + publiczne innych
-                self.recipes = rows.filter { $0.user_id == uid || $0.visibility }
-            } else {
-                // U niezalogowanych pokazujemy tylko publiczne
-                self.recipes = rows.filter { $0.visibility }
+            // 3) If we know the user id, also load private recipes owned by the user
+            var mineRows: [RecipeDTO] = []
+            if let uid = uid, !uid.isEmpty {
+                mineRows = try await client
+                    .from("recipe")
+                    .select("id,title,description,prepare_time,photo,visibility,user_id")
+                    .eq("user_id", value: uid)
+                    .order("title", ascending: true)
+                    .execute()
+                    .value
             }
+
+            // 4) Merge results (dedupe by id) and keep a stable sort by title
+            var merged: [UUID: RecipeDTO] = [:]
+            for r in publicRows { merged[r.id] = r }
+            for r in mineRows { merged[r.id] = r }
+            let result = merged.values.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+
+            self.recipes = result
+            self.error = nil
         } catch {
             self.error = error.localizedDescription
             self.recipes = []

@@ -26,7 +26,7 @@ struct ContentView: View {
                     PantryView()
                 } else if !bootstrapped {
                     ProgressView()
-                } else {
+                } else {
                     EmptyView()
                 }
             }
@@ -36,7 +36,7 @@ struct ContentView: View {
             // 3) Shopping — tab is always present; content depends on auth
             Group {
                 if isLoggedInStable {
-                    if let ownerId = currentUser?.id { // only pass a valid UUID string
+                    if let ownerId = currentUser?.id { // pass only a concrete String
                         ShoppingListsView(ownerId: ownerId)
                     } else if !bootstrapped {
                         ProgressView()
@@ -106,10 +106,10 @@ struct ContentView: View {
                         }
                     }
                 }
-                }
             }
         }
     }
+}
 
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {

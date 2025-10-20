@@ -24,99 +24,6 @@ private struct FavoriteInsert: Encodable {
     let recipe_id: UUID
 }
 
-final class RecipeListViewModel: ObservableObject {
-    @Published var myRecipes: [RecipeListItem] = []
-    @Published var otherRecipes: [RecipeListItem] = []
-    @Published var favorites: Set<UUID> = []
-    @Published var isLoading = false
-    @Published var error: String? = nil
-
-    private let client = SupabaseManager.shared.client
-
-    @MainActor
-    func refresh(currentUserId: String?) async {
-        guard !isLoading else { return }
-        isLoading = true
-        error = nil
-        defer { isLoading = false }
-        do {
-            let rows: [RecipeListItem] = try await client
-                .from("recipe")
-                .select("id,title,description,prepare_time,photo,visibility,user_id")
-                .order("title", ascending: true)
-                .execute()
-                .value
-
-            if let uid = currentUserId {
-                self.myRecipes = rows.filter { $0.authorId == uid }
-                self.otherRecipes = rows.filter { $0.isPublic && $0.authorId != uid }
-
-                // Load favorites for user
-                struct FavRow: Decodable { let recipe_id: UUID }
-                let favRows: [FavRow] = try await client
-                    .from("favorite_recipe")
-                    .select("recipe_id")
-                    .eq("user_id", value: uid)
-                    .execute()
-                    .value
-                self.favorites = Set(favRows.map { $0.recipe_id })
-            } else {
-                self.myRecipes = []
-                self.otherRecipes = rows.filter { $0.isPublic }
-                self.favorites = []
-            }
-        } catch {
-            self.error = error.localizedDescription
-        }
-    }
-
-    func deleteRecipe(_ id: UUID) async {
-        do {
-            _ = try await client
-                .from("recipe")
-                .delete()
-                .eq("id", value: id)
-                .execute()
-            // Also delete related steps (if not cascaded in DB)
-            _ = try? await client
-                .from("recipe_steps")
-                .delete()
-                .eq("recipe_id", value: id)
-                .execute()
-        } catch {
-            _ = await MainActor.run { self.error = error.localizedDescription }
-        }
-    }
-
-    func toggleFavorite(userId: String, recipeId: UUID) async {
-        if favorites.contains(recipeId) {
-            // remove from favorites
-            do {
-                _ = try await client
-                    .from("favorite_recipe")
-                    .delete()
-                    .eq("user_id", value: userId)
-                    .eq("recipe_id", value: recipeId)
-                    .execute()
-                _ = await MainActor.run { self.favorites.remove(recipeId) }
-            } catch {
-                _ = await MainActor.run { self.error = error.localizedDescription }
-            }
-        } else {
-            // add to favorites
-            do {
-                let payload = FavoriteInsert(user_id: userId, recipe_id: recipeId)
-                _ = try await client
-                    .from("favorite_recipe")
-                    .insert(payload)
-                    .execute()
-                _ = await MainActor.run { self.favorites.insert(recipeId) }
-            } catch {
-                _ = await MainActor.run { self.error = error.localizedDescription }
-            }
-        }
-    }
-}
 
 struct RecipeListView: View {
     @EnvironmentObject var auth: AuthViewModel
@@ -244,8 +151,13 @@ struct RecipeListView: View {
     }
 
     private func toggleFavorite(for recipeId: UUID) {
-        guard let uid = auth.currentUser?.id else { return }
-        Task { await viewModel.toggleFavorite(userId: uid, recipeId: recipeId) }
+        Task {
+            if let uid = auth.currentUser?.id, !uid.isEmpty {
+                await viewModel.toggleFavorite(userId: uid, recipeId: recipeId)
+            } else if let session = try? await SupabaseManager.shared.client.auth.session {
+                await viewModel.toggleFavorite(userId: session.user.id.uuidString, recipeId: recipeId)
+            }
+        }
     }
 }
 
