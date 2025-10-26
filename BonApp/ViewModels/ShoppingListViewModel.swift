@@ -57,11 +57,11 @@ final class ShoppingListViewModel: ObservableObject {
     @Published var error: String? = nil
 
     private let client = SupabaseManager.shared.client
-    private let userId: String
+    private let userId: String?
     private let shoppingListId: UUID
 
     // MARK: - Init
-    init(ownerId: String, shoppingListId: UUID) {
+    init(ownerId: String?, shoppingListId: UUID) {
         self.userId = ownerId
         self.shoppingListId = shoppingListId
         Task { await fetchItems() }
@@ -76,15 +76,23 @@ final class ShoppingListViewModel: ObservableObject {
         defer { isLoading = false }
 
         do {
+            // Resolve effective uid (ownerId or current auth session)
+            var effectiveUid: String? = userId
+            if effectiveUid == nil || effectiveUid?.isEmpty == true {
+                if let session = try? await client.auth.session {
+                    effectiveUid = session.user.id.uuidString
+                }
+            }
+
             let rows: [ShoppingListItemDTO] = try await client
                 .from("product_on_list")
-                .select("product_id,count,is_bought,shopping_list_id,product:product_id(id,name,product_category_id),shopping_list!inner(id,user_id)")
+                .select("product_id,count,is_bought,shopping_list_id,product:product_id(id,name,product_category_id)")
                 .eq("shopping_list_id", value: shoppingListId)
-                .eq("shopping_list.user_id", value: userId)
                 .order("is_bought", ascending: true)
                 .order("product_id", ascending: true)
                 .execute()
                 .value
+
             self.items = rows
         } catch {
             self.error = error.localizedDescription
@@ -184,7 +192,7 @@ final class ShoppingListViewModel: ObservableObject {
             guard !rows.isEmpty else { return }
 
             let pantryPayload: [PantryInsert] = rows.map { r in
-                PantryInsert(user_id: userId, product_id: r.product_id, quantity: r.count)
+                PantryInsert(user_id: userId ?? "", product_id: r.product_id, quantity: r.count)
             }
             _ = try await client.from("pantry").insert(pantryPayload).execute()
 
@@ -229,9 +237,9 @@ final class ShoppingListsViewModel: ObservableObject {
     @Published var error: String? = nil
 
     private let client = SupabaseManager.shared.client
-    private let userId: String
+    private let userId: String?
 
-    init(ownerId: String) {
+    init(ownerId: String?) {
         self.userId = ownerId
         Task { await fetchLists() }
     }
@@ -245,10 +253,26 @@ final class ShoppingListsViewModel: ObservableObject {
         defer { isLoading = false }
 
         do {
-            let rows: [ShoppingListDTO] = try await client
+            var effectiveUid: String? = userId
+            if effectiveUid == nil || effectiveUid?.isEmpty == true {
+                if let session = try? await client.auth.session {
+                    effectiveUid = session.user.id.uuidString
+                }
+            }
+
+            let base = client
                 .from("shopping_list")
                 .select("id,name,user_id")
-                .eq("user_id", value: userId)
+
+            let filtered: PostgrestTransformBuilder = {
+                if let uid = effectiveUid, !uid.isEmpty {
+                    return base.eq("user_id", value: uid)
+                } else {
+                    return base
+                }
+            }()
+
+            let rows: [ShoppingListDTO] = try await filtered
                 .order("name", ascending: true)
                 .execute()
                 .value
@@ -262,7 +286,7 @@ final class ShoppingListsViewModel: ObservableObject {
     // MARK: - Create list
     func createList(name: String) async {
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        let payload = ShoppingListInsert(name: name, user_id: userId)
+        let payload = ShoppingListInsert(name: name, user_id: userId ?? "")
         do {
             _ = try await client
                 .from("shopping_list")
@@ -288,7 +312,7 @@ final class ShoppingListsViewModel: ObservableObject {
                 .from("shopping_list")
                 .delete()
                 .eq("id", value: id)
-                .eq("user_id", value: userId)
+                .eq("user_id", value: userId ?? "")
                 .execute()
             await fetchLists()
         } catch {

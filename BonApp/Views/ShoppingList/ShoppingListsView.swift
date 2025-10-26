@@ -3,9 +3,9 @@ import SwiftUI
 // MARK: - List of shopping lists (parent screen)
 struct ShoppingListsView: View {
     @StateObject private var listsVM: ShoppingListsViewModel
-    private let ownerId: String
+    private let ownerId: String?
 
-    init(ownerId: String) {
+    init(ownerId: String?) {
         self.ownerId = ownerId
         _listsVM = StateObject(wrappedValue: ShoppingListsViewModel(ownerId: ownerId))
     }
@@ -22,7 +22,7 @@ struct ShoppingListsView: View {
                     List {
                         ForEach(listsVM.lists, id: \.id) { list in
                             NavigationLink(list.name) {
-                                ShoppingListDetailView(ownerId: ownerId, shoppingListId: list.id)
+                                ShoppingListDetailView(ownerId: ownerId ?? "", shoppingListId: list.id)
                             }
                         }
                     }
@@ -31,6 +31,7 @@ struct ShoppingListsView: View {
         }
         .navigationTitle("Moje listy zakupów")
         .task { await listsVM.fetchLists() }
+        .onAppear { print("🧾 Loaded lists count: \(listsVM.lists.count)") }
         .refreshable { await listsVM.fetchLists() }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {

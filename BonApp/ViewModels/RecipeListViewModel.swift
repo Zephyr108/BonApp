@@ -18,8 +18,7 @@ final class RecipeListViewModel: ObservableObject {
 
     private let client = SupabaseManager.shared.client
 
-    /// Pobiera przepisy i rozdziela je na „Moje” oraz „Użytkowników”.
-    /// - Parameter currentUserId: opcjonalne `users.id`. Gdy `nil`, spróbuje użyć `auth.session.user.id`.
+    // Pobiera przepisy i rozdziela je na „Moje” oraz „Użytkowników”.
     func refresh(currentUserId: String?) async {
         guard !isLoading else { return }
         isLoading = true
@@ -66,7 +65,7 @@ final class RecipeListViewModel: ObservableObject {
                 self.myRecipes = rows.filter { $0.authorId.lowercased() == u }
                 self.otherRecipes = rows.filter { $0.isPublic && $0.authorId.lowercased() != u }
                 #if DEBUG
-                print("📦 recipes: total=\(rows.count), mine=\(self.myRecipes.count), others=\(self.otherRecipes.count)")
+                print("recipes: total=\(rows.count), mine=\(self.myRecipes.count), others=\(self.otherRecipes.count)")
                 #endif
 
                 // 4) Wczytaj ulubione
