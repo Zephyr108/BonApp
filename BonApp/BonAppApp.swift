@@ -17,6 +17,9 @@ struct BonAppApp: App {
             ContentView()
                 .environmentObject(auth)
                 .task {
+                    // Clear any stored session on app launch
+                    await auth.clearSessionOnLaunch()
+
                     // Sync session and user row as early as possible
                     await auth.refreshAuthState()
                 }

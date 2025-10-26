@@ -336,4 +336,22 @@ final class AuthViewModel: ObservableObject {
     // MARK: - Backwards-compat shim (no-op)
     // Core Data used to clear local sessions. With Supabase this is handled by the Auth state.
     func clearOldSessions() {}
+
+    // MARK: - Clear session on app launch
+    @MainActor
+    func clearSessionOnLaunch() async {
+        do {
+            try await client.auth.signOut()
+        } catch {
+            print("[Auth] clearSessionOnLaunch error:", error.localizedDescription)
+        }
+        // Wyczyszczenie stanu lokalnego
+        self.isAuthenticated = false
+        self.currentUser = nil
+        self.email = ""
+        self.password = ""
+        self.name = ""
+        self.preferences = ""
+        self.errorMessage = nil
+    }
 }
