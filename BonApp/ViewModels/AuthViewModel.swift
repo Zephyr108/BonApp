@@ -13,7 +13,10 @@ struct AppUser: Equatable {
     var email: String
     /// Full display name (first + last) if available
     var name: String?
+    /// Legacy string (comma-separated) for views that expect text
     var preferences: String?
+    /// Native array from DB (text[])
+    var preferences_array: [String]?
     /// Keep DB-style fields for legacy views expecting them
     var first_name: String?
     var last_name: String?
@@ -25,7 +28,7 @@ private struct DBUserRow: Decodable {
     let username: String?
     let first_name: String
     let last_name: String?
-    let preferences: String?
+    let preferences: [String]?
 }
 
 private struct DBUserInsert: Encodable {
@@ -34,7 +37,7 @@ private struct DBUserInsert: Encodable {
     let username: String?
     let first_name: String
     let last_name: String?
-    let preferences: String?
+    let preferences: [String]?
 }
 
 private struct DBUserInsertNoId: Encodable {
@@ -42,7 +45,7 @@ private struct DBUserInsertNoId: Encodable {
     let username: String?
     let first_name: String
     let last_name: String?
-    let preferences: String?
+    let preferences: [String]?
 }
 
 private struct DBUserUpdate: Encodable {
@@ -50,7 +53,7 @@ private struct DBUserUpdate: Encodable {
     let username: String?
     let first_name: String
     let last_name: String?
-    let preferences: String?
+    let preferences: [String]?
 }
 
 final class AuthViewModel: ObservableObject {
@@ -83,20 +86,26 @@ final class AuthViewModel: ObservableObject {
     @MainActor
     func register(email: String,
                   password: String,
-                  username: String?,
+                  username: String,
                   firstName: String,
                   lastName: String?,
-                  preferences: String?) async {
+                  preferences: [String]) async {
         errorMessage = nil
 
-        guard Validators.isValidEmail(email) else { errorMessage = "InvalidEmail"; return }
+        let emailTrim = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        let userTrim = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        let firstTrim = firstName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lastTrim = lastName?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard Validators.isValidEmail(emailTrim) else { errorMessage = "InvalidEmail"; return }
         guard Validators.isValidPassword(password) else { errorMessage = "WeakPassword"; return }
-        guard Validators.isNonEmpty(firstName) else { errorMessage = "Name cannot be empty"; return }
+        guard Validators.isNonEmpty(userTrim) else { errorMessage = "Username cannot be empty"; return }
+        guard Validators.isNonEmpty(firstTrim) else { errorMessage = "First name cannot be empty"; return }
 
         do {
             // 1) Sign up in Supabase Auth
             let result = try await client.auth.signUp(
-                email: email,
+                email: emailTrim,
                 password: password
             )
 
@@ -111,11 +120,11 @@ final class AuthViewModel: ObservableObject {
 
             // 3) We have a session – insert profile row, letting DB assign id := auth.uid() by DEFAULT
             let insert = DBUserInsertNoId(
-                email: email,
-                username: username,
-                first_name: firstName,
-                last_name: lastName,
-                preferences: preferences
+                email: emailTrim,
+                username: userTrim,
+                first_name: firstTrim,
+                last_name: (lastTrim?.isEmpty == true ? nil : lastTrim),
+                preferences: preferences.isEmpty ? nil : preferences
             )
             do {
                 _ = try await client
@@ -173,12 +182,13 @@ final class AuthViewModel: ObservableObject {
 
                 // Update public.users row
                 if let authUser = try? await client.auth.user() {
+                    let prefsArray = preferences.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
                     let update = DBUserUpdate(
                         email: email,
                         username: nil, // leave unchanged from this screen
                         first_name: first,
                         last_name: lastOrNil,
-                        preferences: preferences.isEmpty ? nil : preferences
+                        preferences: prefsArray.isEmpty ? nil : prefsArray
                     )
                     _ = try await client
                         .from("users")
@@ -296,11 +306,14 @@ final class AuthViewModel: ObservableObject {
                 if let row = rows.first {
                     let displayName = [row.first_name, row.last_name ?? ""].joined(separator: " ")
                         .trimmingCharacters(in: .whitespaces)
+                    let prefsArray = row.preferences
+                    let prefsString = (prefsArray ?? []).joined(separator: ", ")
                     nextUser = AppUser(
                         id: row.id,
                         email: row.email,
                         name: displayName.isEmpty ? row.first_name : displayName,
-                        preferences: row.preferences,
+                        preferences: prefsArray == nil ? nil : prefsString,
+                        preferences_array: prefsArray,
                         first_name: row.first_name,
                         last_name: row.last_name
                     )
@@ -310,6 +323,7 @@ final class AuthViewModel: ObservableObject {
                         email: authUser.email ?? "",
                         name: nil,
                         preferences: nil,
+                        preferences_array: nil,
                         first_name: nil,
                         last_name: nil
                     )
