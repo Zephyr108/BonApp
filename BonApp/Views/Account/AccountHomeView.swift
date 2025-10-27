@@ -36,17 +36,22 @@ struct AccountHomeView: View {
             Section {
                 Button(role: .destructive) {
                     Task {
-                        await auth.logout()         // jeśli masz logout() async
-                        // na wszelki wypadek “czyścimy sesję”
+                        await auth.logout()
                         await auth.clearSessionOnLaunch()
                     }
                 } label: {
                     Label("Wyloguj", systemImage: "rectangle.portrait.and.arrow.right")
-                        .foregroundColor(.red)
+                        .foregroundColor(Color("logout"))
                 }
             }
         }
         .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
         .navigationTitle("Konto")
+        .background(Color("background").ignoresSafeArea())
     }
+}
+
+#Preview {
+    NavigationStack { AccountHomeView() }
 }

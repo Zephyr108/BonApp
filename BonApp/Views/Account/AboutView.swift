@@ -33,5 +33,10 @@ struct AboutView: View {
             .padding()
         }
         .navigationTitle("O aplikacji")
+        .background(Color("background").ignoresSafeArea())
     }
+}
+
+#Preview {
+    NavigationStack { AboutView() }
 }

@@ -7,8 +7,6 @@
 
 import SwiftUI
 
-/// Lokalna preferencja motywu aplikacji.
-/// Zapisywana w @AppStorage (UserDefaults), bez żadnej komunikacji z bazą.
 enum AppAppearance: String, CaseIterable, Identifiable {
     case system
     case light
@@ -24,7 +22,6 @@ enum AppAppearance: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Mapowanie na SwiftUI ColorScheme (nil oznacza: użyj ustawienia systemu).
     var colorScheme: ColorScheme? {
         switch self {
         case .system: return nil
@@ -35,7 +32,6 @@ enum AppAppearance: String, CaseIterable, Identifiable {
 }
 
 struct SettingsView: View {
-    // Przechowujemy wybór lokalnie – klucz możesz zmienić, jeśli masz swój namespacing.
     @AppStorage("appAppearance") private var appAppearanceRaw: String = AppAppearance.system.rawValue
 
     private var appearance: AppAppearance {
@@ -52,15 +48,14 @@ struct SettingsView: View {
                 }
                 .pickerStyle(.segmented)
 
-                // Mała podpowiedź – zmiana jest lokalna. Globalne zastosowanie w całej aplikacji
-                // najlepiej dodać w root view: `.preferredColorScheme(appearance.colorScheme)`
-                // bazując na tym samym @AppStorage.
                 Text("Zmiana motywu zapisywana jest lokalnie na tym urządzeniu.")
                     .font(.footnote)
                     .foregroundColor(.secondary)
             }
         }
+        .scrollContentBackground(.hidden)
         .navigationTitle("Ustawienia")
+        .background(Color("background").ignoresSafeArea())
     }
 }
 
