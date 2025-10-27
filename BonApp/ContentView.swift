@@ -80,7 +80,7 @@ struct ContentView: View {
     @ViewBuilder
     private var accountContent: some View {
         if isLoggedInStable {
-            ProfileSetupView()
+            AccountHomeView()
                 .onAppear {
                     if !auth.isAuthenticated {
                         selectedTab = .recipes
