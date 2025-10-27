@@ -41,7 +41,7 @@ struct RegistrationView: View {
                         .cornerRadius(8)
                         .textContentType(.newPassword)
 
-                    TextField("Nazwa użytkownika (opcjonalnie)", text: $username)
+                    TextField("Nazwa użytkownika", text: $username)
                         .textInputAutocapitalization(.never)
                         .foregroundColor(Color("textPrimary"))
                         .padding(16)
@@ -63,7 +63,7 @@ struct RegistrationView: View {
                         .cornerRadius(8)
                         .textContentType(.givenName)
 
-                    TextField("Nazwisko (opcjonalnie)", text: $lastName)
+                    TextField("Nazwisko", text: $lastName)
                         .foregroundColor(Color("textPrimary"))
                         .padding(16)
                         .background(Color("textfieldBackground"))
@@ -74,7 +74,7 @@ struct RegistrationView: View {
                         .cornerRadius(8)
                         .textContentType(.familyName)
 
-                    TextField("Preferencje kulinarne (opcjonalnie)", text: $preferences)
+                    TextField("Preferencje kulinarne", text: $preferences)
                         .foregroundColor(Color("textPrimary"))
                         .padding(16)
                         .background(Color("textfieldBackground"))
@@ -94,10 +94,10 @@ struct RegistrationView: View {
                             await auth.register(
                                 email: auth.email,
                                 password: auth.password,
-                                username: username.isEmpty ? nil : username,
+                                username: username,
                                 firstName: firstName,
-                                lastName: lastName.isEmpty ? nil : lastName,
-                                preferences: preferences.isEmpty ? nil : preferences
+                                lastName: lastName,
+                                preferences: preferences
                             )
                         }
                     }

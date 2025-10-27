@@ -34,8 +34,8 @@ struct AuthStartView: View {
                         Text("Zaloguj się")
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.accentColor)
-                            .foregroundColor(.white)
+                            .background(Color("login"))
+                            .foregroundColor(Color("buttonText"))
                             .cornerRadius(12)
                     }
                     
@@ -45,8 +45,8 @@ struct AuthStartView: View {
                         Text("Zarejestruj się")
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color(.systemGray5))
-                            .foregroundColor(.primary)
+                            .background(Color("register"))
+                            .foregroundColor(Color("buttonText"))
                             .cornerRadius(12)
                     }
                 }
@@ -55,6 +55,7 @@ struct AuthStartView: View {
                 Spacer()
             }
             .navigationTitle("Logowanie")
+            .background(Color("background").ignoresSafeArea())
         }
     }
 }
