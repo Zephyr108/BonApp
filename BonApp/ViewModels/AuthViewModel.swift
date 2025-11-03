@@ -51,7 +51,7 @@ private struct DBUserInsertNoId: Encodable {
 private struct DBUserUpdate: Encodable {
     let email: String
     let username: String?
-    let first_name: String
+    let first_name: String?
     let last_name: String?
     let preferences: [String]?
 }
@@ -106,6 +106,17 @@ final class AuthViewModel: ObservableObject {
         let firstTrim = firstName.trimmingCharacters(in: .whitespacesAndNewlines)
         let lastTrim = lastName?.trimmingCharacters(in: .whitespacesAndNewlines)
 
+        // Sanitize inputs: treat "EMPTY" and blanks as nils to avoid polluting DB
+        func cleaned(_ s: String?) -> String? {
+            let t = (s ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            if t.isEmpty { return nil }
+            if t.uppercased() == "EMPTY" { return nil }
+            return t
+        }
+        let cleanUsername = cleaned(userTrim)
+        let cleanFirst    = cleaned(firstTrim)
+        let cleanLast     = cleaned(lastTrim)
+
         guard Validators.isValidEmail(emailTrim) else { errorMessage = "InvalidEmail"; return }
         guard Validators.isValidPassword(password) else { errorMessage = "WeakPassword"; return }
         guard Validators.isNonEmpty(userTrim) else { errorMessage = "Username cannot be empty"; return }
@@ -114,10 +125,10 @@ final class AuthViewModel: ObservableObject {
         do {
             // 1) Build metadata for trigger handle_new_user (no full_name; only atomic fields)
             var metadata = [String: AnyJSON]()
-            if !userTrim.isEmpty { metadata["username"] = try AnyJSON(userTrim) }
-            if !firstTrim.isEmpty { metadata["first_name"] = try AnyJSON(firstTrim) }
-            if let l = lastTrim, !l.isEmpty { metadata["last_name"] = try AnyJSON(l) }
-            if !preferences.isEmpty { metadata["preferences"] = try AnyJSON(preferences) }
+            if let v = cleanUsername { metadata["username"] = try AnyJSON(v) }
+            if let v = cleanFirst    { metadata["first_name"] = try AnyJSON(v) }
+            if let v = cleanLast     { metadata["last_name"]  = try AnyJSON(v) }
+            if !preferences.isEmpty  { metadata["preferences"] = try AnyJSON(preferences) }
 
             // 2) Sign up in Supabase Auth WITH metadata so that trigger `handle_new_user`
             //    can read new.raw_user_meta_data and insert into public.users.
@@ -152,25 +163,24 @@ final class AuthViewModel: ObservableObject {
                   " last:", lastTrim ?? "nil",
                   " prefs:", preferences)
 
-            let upsert = DBUserUpsert(
-                id: uid,
+            let update = DBUserUpdate(
                 email: emailTrim,
-                username: userTrim,
-                first_name: firstTrim,
-                last_name: (lastTrim?.isEmpty == true ? nil : lastTrim),
+                username: cleanUsername,
+                first_name: cleanFirst,
+                last_name: cleanLast,
                 preferences: preferences.isEmpty ? nil : preferences
             )
 
             do {
                 _ = try await client
                     .from("users")
-                    .upsert(upsert, onConflict: "id")
+                    .update(update)
+                    .eq("id", value: uid)
                     .execute()
-                print("[Auth] ✅ Dane użytkownika zapisane dla \(uid)")
+                print("[Auth] ✅ Uaktualniono użytkownika w public.users dla \(uid)")
             } catch {
-                // Nie blokuj rejestracji, ale zaloguj ostrzeżenie
                 let nsErr = error as NSError
-                if nsErr.domain != NSURLErrorDomain { print("[Auth] users upsert warning:", error.localizedDescription) }
+                if nsErr.domain != NSURLErrorDomain { print("[Auth] users update warning:", error.localizedDescription) }
             }
 
             // 4) Refresh local state
@@ -325,13 +335,19 @@ final class AuthViewModel: ObservableObject {
             // Ensure there is a users row after first login (email confirm flow)
             do {
                 let meta = authUser.userMetadata
-                let u = (meta["username"] as? String) ?? ""
-                let f = (meta["first_name"] as? String) ?? ""
-                let l = (meta["last_name"] as? String)
+                func cleaned(_ s: String?) -> String? {
+                    let t = (s ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                    if t.isEmpty { return nil }
+                    if t.uppercased() == "EMPTY" { return nil }
+                    return t
+                }
+                let u = cleaned(meta["username"] as? String)
+                let f = cleaned(meta["first_name"] as? String)
+                let l = cleaned(meta["last_name"] as? String)
                 let p = meta["preferences"] as? [String]
-                let ensure = DBUserUpsert(
-                    id: authUser.id.uuidString,
-                    email: authUser.email!,
+
+                let ensure = DBUserUpdate(
+                    email: authUser.email ?? "",
                     username: u,
                     first_name: f,
                     last_name: l,
@@ -339,7 +355,8 @@ final class AuthViewModel: ObservableObject {
                 )
                 _ = try await client
                     .from("users")
-                    .upsert(ensure, onConflict: "id")
+                    .update(ensure)
+                    .eq("id", value: authUser.id.uuidString)
                     .execute()
             } catch {
                 // best-effort
