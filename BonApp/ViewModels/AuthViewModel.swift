@@ -56,6 +56,15 @@ private struct DBUserUpdate: Encodable {
     let preferences: [String]?
 }
 
+private struct DBUserUpsert: Encodable {
+    let id: String
+    let email: String
+    let username: String
+    let first_name: String
+    let last_name: String?
+    let preferences: [String]?
+}
+
 final class AuthViewModel: ObservableObject {
     // MARK: - Inputs
     @Published var email: String = ""
@@ -118,23 +127,39 @@ final class AuthViewModel: ObservableObject {
                 return
             }
 
-            // 3) We have a session – insert profile row, letting DB assign id := auth.uid() by DEFAULT
-            let insert = DBUserInsertNoId(
+            // 3) We have a session – upsert profile row by id (covers placeholder row created by trigger)
+            // Pobieramy UID z odpowiedzi lub fallbacków
+            var uidString: String?
+            // In current SDK result.user is non-optional; avoid optional chaining
+            uidString = result.user.id.uuidString
+            if uidString == nil || uidString?.isEmpty == true, let authUser = try? await client.auth.user() { uidString = authUser.id.uuidString }
+            if uidString == nil || uidString?.isEmpty == true, let session = try? await client.auth.session { uidString = session.user.id.uuidString }
+
+            guard let uid = uidString else {
+                print("[Auth] ❌ Brak UID po rejestracji")
+                await refreshAuthState()
+                return
+            }
+
+            let upsert = DBUserUpsert(
+                id: uid,
                 email: emailTrim,
                 username: userTrim,
                 first_name: firstTrim,
                 last_name: (lastTrim?.isEmpty == true ? nil : lastTrim),
                 preferences: preferences.isEmpty ? nil : preferences
             )
+
             do {
                 _ = try await client
                     .from("users")
-                    .insert(insert)
+                    .upsert(upsert, onConflict: "id")
                     .execute()
+                print("[Auth] ✅ Dane użytkownika zapisane dla \(uid)")
             } catch {
-                // Jeśli polityka RLS nadal zablokuje (np. nietypowe ustawienia), nie psuj rejestracji
+                // Nie blokuj rejestracji, ale zaloguj ostrzeżenie
                 let nsErr = error as NSError
-                if nsErr.domain != NSURLErrorDomain { print("[Auth] users insert warning:", error.localizedDescription) }
+                if nsErr.domain != NSURLErrorDomain { print("[Auth] users upsert warning:", error.localizedDescription) }
             }
 
             // 4) Refresh local state
@@ -204,12 +229,6 @@ final class AuthViewModel: ObservableObject {
         }
     }
 
-
-    // MARK: - Login (legacy wrapper)
-    @available(*, deprecated, message: "Use async login() instead")
-    func loginLegacy() {
-        Task { await self.login() }
-    }
 
     // MARK: - Login (async with retry)
     @MainActor
@@ -310,7 +329,7 @@ final class AuthViewModel: ObservableObject {
                     let prefsString = (prefsArray ?? []).joined(separator: ", ")
                     nextUser = AppUser(
                         id: row.id,
-                        email: row.email,
+                        email: authUser.email!,
                         name: displayName.isEmpty ? row.first_name : displayName,
                         preferences: prefsArray == nil ? nil : prefsString,
                         preferences_array: prefsArray,
@@ -320,7 +339,7 @@ final class AuthViewModel: ObservableObject {
                 } else {
                     nextUser = AppUser(
                         id: authUser.id.uuidString,
-                        email: authUser.email ?? "",
+                        email: authUser.email!,
                         name: nil,
                         preferences: nil,
                         preferences_array: nil,

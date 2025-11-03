@@ -18,7 +18,7 @@ struct RegistrationView: View {
     @State private var lastName: String = ""
     @State private var preferences: String = ""
 
-    var body: some View {
+var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
