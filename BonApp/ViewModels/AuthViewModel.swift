@@ -112,23 +112,29 @@ final class AuthViewModel: ObservableObject {
         guard Validators.isNonEmpty(firstTrim) else { errorMessage = "First name cannot be empty"; return }
 
         do {
-            // 1) Sign up in Supabase Auth
+            // 1) Build metadata for trigger handle_new_user (no full_name; only atomic fields)
+            var metadata = [String: AnyJSON]()
+            if !userTrim.isEmpty { metadata["username"] = try AnyJSON(userTrim) }
+            if !firstTrim.isEmpty { metadata["first_name"] = try AnyJSON(firstTrim) }
+            if let l = lastTrim, !l.isEmpty { metadata["last_name"] = try AnyJSON(l) }
+            if !preferences.isEmpty { metadata["preferences"] = try AnyJSON(preferences) }
+
+            // 2) Sign up in Supabase Auth WITH metadata so that trigger `handle_new_user`
+            //    can read new.raw_user_meta_data and insert into public.users.
             let result = try await client.auth.signUp(
                 email: emailTrim,
-                password: password
+                password: password,
+                data: metadata
             )
 
-            // 2) If no session yet (email confirmation flow), DO NOT insert to public.users now – RLS would reject.
-            //    Poczekaj aż użytkownik się zaloguje po potwierdzeniu – wtedy refreshAuthState zadba o resztę.
+            // 3) If no session yet (email confirmation flow), DO NOT touch public.users here.
+            //    The trigger will have created the row already from metadata; we'll load it after login.
             guard result.session != nil else {
                 await refreshAuthState()
-                // komunikat przyjazny – konto utworzone, sprawdź maila
                 if self.isAuthenticated == false { self.errorMessage = "Check your email to confirm the account." }
                 return
             }
 
-            // 3) We have a session – upsert profile row by id (covers placeholder row created by trigger)
-            // Pobieramy UID z odpowiedzi lub fallbacków
             var uidString: String?
             // In current SDK result.user is non-optional; avoid optional chaining
             uidString = result.user.id.uuidString
@@ -140,6 +146,11 @@ final class AuthViewModel: ObservableObject {
                 await refreshAuthState()
                 return
             }
+            print("[Auth] upsert -> uid:", uid,
+                  " username:", userTrim,
+                  " first:", firstTrim,
+                  " last:", lastTrim ?? "nil",
+                  " prefs:", preferences)
 
             let upsert = DBUserUpsert(
                 id: uid,
@@ -311,6 +322,29 @@ final class AuthViewModel: ObservableObject {
                 return
             }
 
+            // Ensure there is a users row after first login (email confirm flow)
+            do {
+                let meta = authUser.userMetadata
+                let u = (meta["username"] as? String) ?? ""
+                let f = (meta["first_name"] as? String) ?? ""
+                let l = (meta["last_name"] as? String)
+                let p = meta["preferences"] as? [String]
+                let ensure = DBUserUpsert(
+                    id: authUser.id.uuidString,
+                    email: authUser.email!,
+                    username: u,
+                    first_name: f,
+                    last_name: l,
+                    preferences: p
+                )
+                _ = try await client
+                    .from("users")
+                    .upsert(ensure, onConflict: "id")
+                    .execute()
+            } catch {
+                // best-effort
+            }
+
             // 2) Try to load profile row; build AppUser
             var nextUser: AppUser
             do {
@@ -329,17 +363,37 @@ final class AuthViewModel: ObservableObject {
                     let prefsString = (prefsArray ?? []).joined(separator: ", ")
                     nextUser = AppUser(
                         id: row.id,
-                        email: authUser.email!,
+                        email: authUser.email ?? "",
                         name: displayName.isEmpty ? row.first_name : displayName,
                         preferences: prefsArray == nil ? nil : prefsString,
                         preferences_array: prefsArray,
                         first_name: row.first_name,
                         last_name: row.last_name
                     )
+                    // Ensure Auth user_metadata has up-to-date atomic fields (no full_name)
+                    do {
+                        // Build only meaningful metadata to avoid overwriting with empty strings
+                        let usernameSanitized = row.username?.trimmingCharacters(in: .whitespaces) ?? ""
+                        let firstSanitizedRaw = row.first_name.trimmingCharacters(in: .whitespaces)
+                        let firstSanitized = (firstSanitizedRaw.isEmpty || firstSanitizedRaw.uppercased() == "EMPTY") ? "" : firstSanitizedRaw
+                        let lastSanitized = (row.last_name ?? "").trimmingCharacters(in: .whitespaces)
+
+                        var md = [String: AnyJSON]()
+                        if !firstSanitized.isEmpty { md["first_name"] = try AnyJSON(firstSanitized) }
+                        if !lastSanitized.isEmpty { md["last_name"] = try AnyJSON(lastSanitized) }
+                        if !usernameSanitized.isEmpty { md["username"] = try AnyJSON(usernameSanitized) }
+                        if let prefs = row.preferences, !prefs.isEmpty { md["preferences"] = try AnyJSON(prefs) }
+
+                        if !md.isEmpty {
+                            try await client.auth.update(user: UserAttributes(data: md))
+                        }
+                    } catch {
+                        // best-effort; silent failure
+                    }
                 } else {
                     nextUser = AppUser(
                         id: authUser.id.uuidString,
-                        email: authUser.email!,
+                        email: authUser.email ?? "",
                         name: nil,
                         preferences: nil,
                         preferences_array: nil,
