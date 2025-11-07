@@ -7,17 +7,13 @@ import Foundation
 import Combine
 import Supabase
 
-// MARK: - Helper model for the current user (metadata from Supabase)
+// MARK: - Helper model for the current user
 struct AppUser: Equatable {
     let id: String
     var email: String
-    /// Full display name (first + last) if available
     var name: String?
-    /// Legacy string (comma-separated) for views that expect text
     var preferences: String?
-    /// Native array from DB (text[])
     var preferences_array: [String]?
-    /// Keep DB-style fields for legacy views expecting them
     var first_name: String?
     var last_name: String?
 }
@@ -79,7 +75,6 @@ final class AuthViewModel: ObservableObject {
     @Published var isLoading: Bool = false
     @Published private(set) var isRefreshingAuth: Bool = false
 
-    /// Cached/cheap accessor: returns the user id if `currentUser` is already loaded; otherwise nil.
     var activeUserId: String? { currentUser?.id }
 
     private let client: SupabaseClient
@@ -87,11 +82,10 @@ final class AuthViewModel: ObservableObject {
 
     init(client: SupabaseClient = SupabaseManager.shared.client) {
         self.client = client
-        // Load session/user at startup
         Task { await refreshAuthState() }
     }
 
-    // MARK: - Registration (users table aware)
+    // MARK: - Registration
     @MainActor
     func register(email: String,
                   password: String,
@@ -106,7 +100,6 @@ final class AuthViewModel: ObservableObject {
         let firstTrim = firstName.trimmingCharacters(in: .whitespacesAndNewlines)
         let lastTrim = lastName?.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // Sanitize inputs: treat "EMPTY" and blanks as nils to avoid polluting DB
         func cleaned(_ s: String?) -> String? {
             let t = (s ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             if t.isEmpty { return nil }
@@ -123,23 +116,18 @@ final class AuthViewModel: ObservableObject {
         guard Validators.isNonEmpty(firstTrim) else { errorMessage = "First name cannot be empty"; return }
 
         do {
-            // 1) Build metadata for trigger handle_new_user (no full_name; only atomic fields)
             var metadata = [String: AnyJSON]()
             if let v = cleanUsername { metadata["username"] = try AnyJSON(v) }
             if let v = cleanFirst    { metadata["first_name"] = try AnyJSON(v) }
             if let v = cleanLast     { metadata["last_name"]  = try AnyJSON(v) }
             if !preferences.isEmpty  { metadata["preferences"] = try AnyJSON(preferences) }
 
-            // 2) Sign up in Supabase Auth WITH metadata so that trigger `handle_new_user`
-            //    can read new.raw_user_meta_data and insert into public.users.
             let result = try await client.auth.signUp(
                 email: emailTrim,
                 password: password,
                 data: metadata
             )
 
-            // 3) If no session yet (email confirmation flow), DO NOT touch public.users here.
-            //    The trigger will have created the row already from metadata; we'll load it after login.
             guard result.session != nil else {
                 await refreshAuthState()
                 if self.isAuthenticated == false { self.errorMessage = "Check your email to confirm the account." }
@@ -147,13 +135,12 @@ final class AuthViewModel: ObservableObject {
             }
 
             var uidString: String?
-            // In current SDK result.user is non-optional; avoid optional chaining
             uidString = result.user.id.uuidString
             if uidString == nil || uidString?.isEmpty == true, let authUser = try? await client.auth.user() { uidString = authUser.id.uuidString }
             if uidString == nil || uidString?.isEmpty == true, let session = try? await client.auth.session { uidString = session.user.id.uuidString }
 
             guard let uid = uidString else {
-                print("[Auth] ❌ Brak UID po rejestracji")
+                print("[Auth] Brak UID po rejestracji")
                 await refreshAuthState()
                 return
             }
@@ -177,13 +164,12 @@ final class AuthViewModel: ObservableObject {
                     .update(update)
                     .eq("id", value: uid)
                     .execute()
-                print("[Auth] ✅ Uaktualniono użytkownika w public.users dla \(uid)")
+                print("[Auth] Uaktualniono użytkownika w public.users dla \(uid)")
             } catch {
                 let nsErr = error as NSError
                 if nsErr.domain != NSURLErrorDomain { print("[Auth] users update warning:", error.localizedDescription) }
             }
 
-            // 4) Refresh local state
             await refreshAuthState()
             self.email = ""; self.password = ""; self.name = ""; self.preferences = ""
         } catch {
@@ -212,13 +198,11 @@ final class AuthViewModel: ObservableObject {
 
         Task { @MainActor in
             do {
-                // Split display name into first/last
                 let parts = name.split(separator: " ")
                 let first = parts.first.map(String.init) ?? name
                 let last = parts.dropFirst().joined(separator: " ")
                 let lastOrNil = last.isEmpty ? nil : last
 
-                // Update Auth user (email/password)
                 try await client.auth.update(
                     user: UserAttributes(
                         email: email,
@@ -226,12 +210,11 @@ final class AuthViewModel: ObservableObject {
                     )
                 )
 
-                // Update public.users row
                 if let authUser = try? await client.auth.user() {
                     let prefsArray = preferences.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
                     let update = DBUserUpdate(
                         email: email,
-                        username: nil, // leave unchanged from this screen
+                        username: nil,
                         first_name: first,
                         last_name: lastOrNil,
                         preferences: prefsArray.isEmpty ? nil : prefsArray
@@ -251,7 +234,7 @@ final class AuthViewModel: ObservableObject {
     }
 
 
-    // MARK: - Login (async with retry)
+    // MARK: - Login
     @MainActor
     func login() async {
         isLoading = true
@@ -266,7 +249,6 @@ final class AuthViewModel: ObservableObject {
             do {
                 try await signInInternal(email: emailTrim, password: pass)
                 self.isAuthenticated = true
-                // Refresh in background so we don't immediately overwrite the flag if session propagation lags
                 Task { await self.refreshAuthState() }
                 return
             } catch {
@@ -292,19 +274,17 @@ final class AuthViewModel: ObservableObject {
         try await SupabaseManager.shared.client.auth.signIn(email: email, password: password)
     }
 
-    // MARK: - Logout (async)
+    // MARK: - Logout
     @MainActor
     func logout() async {
         await signOut()
     }
 
-    /// Async sign-out API used by UI (ContentView). Non-throwing.
     @MainActor
     func signOut() async {
         do {
             try await client.auth.signOut()
         } catch {
-            // Log but proceed to clear local state
             print("Sign out error: \(error.localizedDescription)")
         }
         self.isAuthenticated = false
@@ -318,21 +298,17 @@ final class AuthViewModel: ObservableObject {
     // MARK: - Session/User helpers
     @MainActor
     func refreshAuthState() async {
-        // Prevent overlapping refreshes that cause flicker
         if isRefreshingAuth { return }
         isRefreshingAuth = true
         defer { isRefreshingAuth = false }
 
         do {
-            // 1) Check session
             guard let authUser = try? await client.auth.user() else {
-                // No session – mark logged out
                 self.isAuthenticated = false
                 self.currentUser = nil
                 return
             }
 
-            // Ensure there is a users row after first login (email confirm flow)
             do {
                 let meta = authUser.userMetadata
                 func cleaned(_ s: String?) -> String? {
@@ -359,10 +335,8 @@ final class AuthViewModel: ObservableObject {
                     .eq("id", value: authUser.id.uuidString)
                     .execute()
             } catch {
-                // best-effort
             }
 
-            // 2) Try to load profile row; build AppUser
             var nextUser: AppUser
             do {
                 let rows: [DBUserRow] = try await client
@@ -387,9 +361,7 @@ final class AuthViewModel: ObservableObject {
                         first_name: row.first_name,
                         last_name: row.last_name
                     )
-                    // Ensure Auth user_metadata has up-to-date atomic fields (no full_name)
                     do {
-                        // Build only meaningful metadata to avoid overwriting with empty strings
                         let usernameSanitized = row.username?.trimmingCharacters(in: .whitespaces) ?? ""
                         let firstSanitizedRaw = row.first_name.trimmingCharacters(in: .whitespaces)
                         let firstSanitized = (firstSanitizedRaw.isEmpty || firstSanitizedRaw.uppercased() == "EMPTY") ? "" : firstSanitizedRaw
@@ -405,7 +377,6 @@ final class AuthViewModel: ObservableObject {
                             try await client.auth.update(user: UserAttributes(data: md))
                         }
                     } catch {
-                        // best-effort; silent failure
                     }
                 } else {
                     nextUser = AppUser(
@@ -420,16 +391,13 @@ final class AuthViewModel: ObservableObject {
                 }
             }
 
-            // 3) Publish once (prevents temporary fallback to logged-out)
             self.isAuthenticated = true
             self.currentUser = nextUser
         } catch {
-            // Network/temporary problems – do not flip to logged-out state
             print("[Auth] refreshAuthState error:", error.localizedDescription)
         }
     }
 
-    /// Resolve the active user id. If the profile row hasn't loaded yet, falls back to the Supabase Auth user id.
     @MainActor
     func resolveActiveUserId() async -> String? {
         if let id = currentUser?.id { return id }
@@ -437,8 +405,7 @@ final class AuthViewModel: ObservableObject {
         return nil
     }
 
-    // MARK: - Backwards-compat shim (no-op)
-    // Core Data used to clear local sessions. With Supabase this is handled by the Auth state.
+    // MARK: - Backwards-compat shim
     func clearOldSessions() {}
 
     // MARK: - Clear session on app launch
@@ -449,7 +416,6 @@ final class AuthViewModel: ObservableObject {
         } catch {
             print("[Auth] clearSessionOnLaunch error:", error.localizedDescription)
         }
-        // Wyczyszczenie stanu lokalnego
         self.isAuthenticated = false
         self.currentUser = nil
         self.email = ""

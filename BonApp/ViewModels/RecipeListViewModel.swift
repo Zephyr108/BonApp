@@ -18,7 +18,6 @@ final class RecipeListViewModel: ObservableObject {
 
     private let client = SupabaseManager.shared.client
 
-    // Pobiera przepisy i rozdziela je na „Moje” oraz „Użytkowników”.
     func refresh(currentUserId: String?) async {
         guard !isLoading else { return }
         isLoading = true
@@ -26,7 +25,6 @@ final class RecipeListViewModel: ObservableObject {
         defer { isLoading = false }
 
         do {
-            // 1) Ustal efektywny UID (profil lub sesja)
             var effectiveUid: String? = currentUserId
             if effectiveUid == nil {
                 if let session = try? await client.auth.session {
@@ -34,7 +32,6 @@ final class RecipeListViewModel: ObservableObject {
                 }
             }
 
-            // Pobierz publiczne i (jeśli znamy uid) także moje; potem scal i posortuj
             let publicRows: [RecipeListItem] = try await client
                 .from("recipe")
                 .select("id,title,description,prepare_time,photo,visibility,user_id")
@@ -59,7 +56,6 @@ final class RecipeListViewModel: ObservableObject {
             for r in mineRows { dict[r.id] = r }
             let rows = dict.values.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
 
-            // 3) Rozdziel na sekcje
             if let uid = effectiveUid, !uid.isEmpty {
                 let u = uid.lowercased()
                 self.myRecipes = rows.filter { $0.authorId.lowercased() == u }
@@ -68,7 +64,6 @@ final class RecipeListViewModel: ObservableObject {
                 print("recipes: total=\(rows.count), mine=\(self.myRecipes.count), others=\(self.otherRecipes.count)")
                 #endif
 
-                // 4) Wczytaj ulubione
                 struct FavRow: Decodable { let recipe_id: UUID }
                 let favRows: [FavRow] = try await client
                     .from("favorite_recipe")
@@ -78,7 +73,6 @@ final class RecipeListViewModel: ObservableObject {
                     .value
                 self.favorites = Set(favRows.map { $0.recipe_id })
             } else {
-                // Brak UID → nie pokazuj „Moich”, pokaż tylko publiczne
                 self.myRecipes = []
                 self.otherRecipes = rows.filter { $0.isPublic }
                 self.favorites = []

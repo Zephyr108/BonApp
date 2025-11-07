@@ -86,7 +86,6 @@ struct RecipeRowView: View {
     }
     
     private func toggleFavorite() {
-        // Placeholder function to toggle favorite status in Supabase
     }
 }
 

@@ -33,7 +33,6 @@ struct EditRecipeView: View {
     @State private var stepTexts: [String]
     @State private var newStepText: String = ""
 
-    // Image handling
     @State private var selectedImage: UIImage? = nil
     @State private var currentImageURL: String? = nil
     @State private var isShowingImagePicker = false
@@ -294,7 +293,6 @@ struct EditRecipeView: View {
             .filter { !$0.isEmpty }
 
         do {
-            // Handle image: upload new or remove
             var newImageURL: String? = currentImageURL
             if let img = selectedImage, let data = img.jpegData(compressionQuality: 0.85) {
                 let path = "\(recipeId)/image.jpg"
@@ -307,7 +305,6 @@ struct EditRecipeView: View {
                 newImageURL = nil
             }
 
-            // 1) Update main recipe row
             let updatePayload = RecipeUpdatePayload(
                 title: title,
                 detail: detail,
@@ -324,7 +321,6 @@ struct EditRecipeView: View {
                 .eq("user_id", value: auth.currentUser?.id ?? "")
                 .execute()
 
-            // 2) Replace steps: delete existing, insert new
             _ = try await client
                 .from("recipe_steps")
                 .delete()

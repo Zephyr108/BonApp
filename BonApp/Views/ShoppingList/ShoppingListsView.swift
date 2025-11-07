@@ -38,7 +38,6 @@ struct ShoppingListsView: View {
                 Button { Task { await listsVM.createList(name: "Nowa lista") } } label: { Image(systemName: "plus") }
             }
         }
-        // Show error text (debug)
         if let err = listsVM.error {
             Text(err).font(.footnote).foregroundColor(.red).padding()
         }

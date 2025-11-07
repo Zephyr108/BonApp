@@ -55,7 +55,6 @@ final class RecipeSearchViewModel: ObservableObject {
                 .from("recipe")
                 .select("id,title,description,prepare_time,photo,visibility,user_id")
 
-            // Apply filters first (on PostgrestFilterBuilder)
             rq = rq.lte("prepare_time", value: maxCookTime)
 
             let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -67,11 +66,9 @@ final class RecipeSearchViewModel: ObservableObject {
                 rq = rq.in("id", values: favIds)
             }
 
-            // Apply ordering at the end and execute in one step
             let rows: [SearchRecipeItem] = try await rq.order("title", ascending: true).execute().value
 
             if let uid = currentUserId {
-                // Only show my recipes or public ones by others
                 self.results = rows.filter { $0.userId == uid || $0.isPublic }
             } else {
                 self.results = rows.filter { $0.isPublic }

@@ -34,7 +34,6 @@ struct RecipeDetailItem: Identifiable, Hashable, Decodable {
         case isPublic = "visibility"
         case userId = "user_id"
         case stepsList = "steps_list"
-        // ingredients are not in DB – they may be built elsewhere; default empty
     }
 
     init(id: UUID, title: String, detail: String?, cookTime: Int, imageURL: String?, ingredients: [String], isPublic: Bool, userId: String, steps: [RecipeStepItem]) {
@@ -59,10 +58,8 @@ struct RecipeDetailItem: Identifiable, Hashable, Decodable {
         self.isPublic = try c.decodeIfPresent(Bool.self, forKey: .isPublic) ?? true
         self.userId = try c.decodeIfPresent(String.self, forKey: .userId) ?? ""
 
-        // Ingredients are not persisted in current schema; default to empty
         self.ingredients = []
 
-        // Decode steps_list – support both array of objects and array of strings
         if let stepObjs = try? c.decode([RecipeStepItem].self, forKey: .stepsList) {
             self.steps = stepObjs.sorted { $0.order < $1.order }
         } else if let stepStrings = try? c.decode([String].self, forKey: .stepsList) {

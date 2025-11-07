@@ -1,15 +1,12 @@
 import Foundation
 import Supabase
 
-// ViewModel for recipe recommendations (Supabase)
 final class RecommendationsViewModel: ObservableObject {
-    // Filters
     @Published var filterVegetarian: Bool = false
     @Published var filterQuick: Bool = false
     @Published var filterBudget: Bool = false
     @Published var maxMissingIngredients: Int = 3
 
-    // State
     @Published var recommendations: [RecipeItem] = []
     @Published var isLoading: Bool = false
     @Published var error: String? = nil

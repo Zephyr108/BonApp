@@ -78,7 +78,6 @@ final class PantryScreenViewModel: ObservableObject {
     func deleteItems(with ids: Set<UUID>) async {
         guard !ids.isEmpty else { return }
         do {
-            // Batch delete with `in` filter
             _ = try await client
                 .from("pantry")
                 .delete()

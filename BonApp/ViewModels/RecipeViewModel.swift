@@ -89,7 +89,6 @@ final class RecipeViewModel: ObservableObject {
         error = nil
         defer { isLoading = false }
         do {
-            // 1) Resolve current user id (injected or from auth session)
             var uid: String? = currentUserId
             if uid == nil {
                 if let session = try? await client.auth.session {
@@ -97,7 +96,6 @@ final class RecipeViewModel: ObservableObject {
                 }
             }
 
-            // 2) Load public recipes
             let publicRows: [RecipeDTO] = try await client
                 .from("recipe")
                 .select("id,title,description,prepare_time,photo,visibility,user_id")
@@ -106,7 +104,6 @@ final class RecipeViewModel: ObservableObject {
                 .execute()
                 .value
 
-            // 3) If we know the user id, also load private recipes owned by the user
             var mineRows: [RecipeDTO] = []
             if let uid = uid, !uid.isEmpty {
                 mineRows = try await client
@@ -118,13 +115,11 @@ final class RecipeViewModel: ObservableObject {
                     .value
             }
 
-            // 4) Merge results (dedupe by id) and keep a stable sort by title
             var merged: [UUID: RecipeDTO] = [:]
             for r in publicRows { merged[r.id] = r }
             for r in mineRows { merged[r.id] = r }
             let result = merged.values.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
 
-            // Split into sections for the UI
             if let uid = uid, !uid.isEmpty {
                 self.myRecipes = result.filter { $0.user_id == uid }
                 self.otherRecipes = result.filter { $0.visibility && $0.user_id != uid }
@@ -142,7 +137,6 @@ final class RecipeViewModel: ObservableObject {
     }
 
     // MARK: - Add
-    /// Tworzy nowy przepis w Supabase. Jeśli podasz `imageData`, zapisze plik w bucketcie `recipes`.
     @MainActor
     func addRecipe(
         title: String,
@@ -163,7 +157,6 @@ final class RecipeViewModel: ObservableObject {
         var photoURL: String? = nil
 
         do {
-            // 1) Optional image upload
             if let data = imageData {
                 let path = "\(user_id)/recipes/\(recipeId).jpg"
                 _ = try await client.storage
@@ -173,7 +166,6 @@ final class RecipeViewModel: ObservableObject {
                 photoURL = try client.storage.from("recipes").getPublicURL(path: path).absoluteString
             }
 
-            // 2) Insert row
             let payload = RecipeInsert(
                 id: recipeId,
                 title: title,
@@ -192,7 +184,6 @@ final class RecipeViewModel: ObservableObject {
 
             await fetchRecipes()
         } catch {
-            // If DB insert failed but we already uploaded image, try to remove the orphan file
             if let path = uploadedPath {
                 try? await client.storage.from("recipes").remove(paths: [path])
             }
@@ -201,7 +192,6 @@ final class RecipeViewModel: ObservableObject {
     }
 
     // MARK: - Update
-    /// Aktualizuje przepis; jeśli przekażesz `newImageData`, nadpisze obraz w Storage.
     func updateRecipe(
         id: UUID,
         title: String,
@@ -267,8 +257,6 @@ final class RecipeViewModel: ObservableObject {
                 .eq("id", value: id)
                 .execute()
 
-            // Best-effort: remove possible image file with known pattern
-            // (ignores errors if file doesn't exist)
             if let uid = currentUserId {
                 let path = "\(uid)/recipes/\(id).jpg"
                 try? await client.storage.from("recipes").remove(paths: [path])
@@ -281,7 +269,6 @@ final class RecipeViewModel: ObservableObject {
     }
 
     // MARK: - Kroki
-    /// Dodaje krok do przepisu. Ustala `order` jako (max(order) + 1).
     func addStep(_ instruction: String, to recipeId: UUID) async {
         do {
             struct StepsRow: Decodable { let steps_list: [String]? }
@@ -309,7 +296,6 @@ final class RecipeViewModel: ObservableObject {
         }
     }
 
-    /// Zwraca surową listę kroków dokładnie tak, jak jest zapisana w kolumnie `steps_list` (JSONB array of strings).
     @MainActor
     func rawSteps(for recipeId: UUID) async -> [String] {
         do {
@@ -328,7 +314,6 @@ final class RecipeViewModel: ObservableObject {
         }
     }
 
-    /// Zwraca kroki przepisu posortowane po `order`.
     @MainActor
     func steps(for recipeId: UUID) async -> [RecipeStepDTO] {
         let texts = await rawSteps(for: recipeId)

@@ -154,7 +154,7 @@ struct RecipeListView: View {
             ingredients: [],
             isPublic: recipe.isPublic,
             userId: recipe.authorId,
-            steps: [] // możesz doładować w szczegółach jeśli chcesz
+            steps: []
         ))
     }
 

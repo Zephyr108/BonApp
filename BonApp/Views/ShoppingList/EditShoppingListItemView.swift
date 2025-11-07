@@ -100,7 +100,6 @@ struct EditShoppingListItemView: View {
                 struct ProductOnListUpdate: Encodable { let count: Double?; let is_bought: Bool? }
 
                 if pid != initialProductId {
-                    // Change of product: delete old row and insert a new one
                     _ = try await client
                         .from("product_on_list")
                         .delete()
@@ -111,7 +110,6 @@ struct EditShoppingListItemView: View {
                     let insertPayload = ProductOnListInsert(shopping_list_id: shoppingListId, product_id: pid, count: qty, is_bought: false)
                     _ = try await client.from("product_on_list").insert(insertPayload).execute()
                 } else {
-                    // Same product: just update the count
                     let updatePayload = ProductOnListUpdate(count: qty, is_bought: nil)
                     _ = try await client
                         .from("product_on_list")

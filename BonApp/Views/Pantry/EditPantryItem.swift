@@ -76,7 +76,6 @@ struct EditPantryItemView: View {
                 .execute()
                 .value
             self.products = rows
-            // Jeśli nie ustawiono wstępnie produktu, spróbuj zostawić bez zmian (użytkownik wybierze z menu)
         } catch {
             print("Błąd ładowania produktów: \(error.localizedDescription)")
         }

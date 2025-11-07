@@ -5,22 +5,18 @@ struct ContentView: View {
     @State private var selectedTab: Tab = .recipes
     @EnvironmentObject var auth: AuthViewModel
     
-    // Consider the user logged-in as soon as auth says so (profile row may load later)
     private var isLoggedInStable: Bool { auth.isAuthenticated }
     
-    // Avoid flicker: until we refresh auth once, show placeholders instead of logged-out UI
     @State private var bootstrapped = false
     
     private var currentUser: AppUser? { auth.currentUser }
     
     var body: some View {
         TabView(selection: $selectedTab) {
-            // 1) Recipes — always visible
             RecipeListView()
                 .tabItem { Label("Przepisy", systemImage: "book") }
                 .tag(Tab.recipes)
             
-            // 2) Pantry — tab is always present; content depends on auth
             Group {
                 if isLoggedInStable {
                     PantryView()
@@ -33,10 +29,9 @@ struct ContentView: View {
             .tabItem { Label("Spiżarnia", systemImage: "tray.fill") }
             .tag(Tab.pantry)
             
-            // 3) Shopping — tab is always present; content depends on auth
             Group {
                 if isLoggedInStable {
-                    if let ownerId = currentUser?.id { // pass only a concrete String
+                    if let ownerId = currentUser?.id {
                         ShoppingListsView(ownerId: ownerId)
                     } else if !bootstrapped {
                         ProgressView()
@@ -52,7 +47,6 @@ struct ContentView: View {
             .tabItem { Label("Zakupy", systemImage: "cart.fill") }
             .tag(Tab.shopping)
             
-            // 4) Account — always visible
             NavigationStack {
                 accountContent
                     .navigationTitle("Konto")

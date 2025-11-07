@@ -76,7 +76,6 @@ final class ShoppingListViewModel: ObservableObject {
         defer { isLoading = false }
 
         do {
-            // Resolve effective uid (ownerId or current auth session)
             var effectiveUid: String? = userId
             if effectiveUid == nil || effectiveUid?.isEmpty == true {
                 if let session = try? await client.auth.session {

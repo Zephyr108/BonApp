@@ -8,15 +8,12 @@
 import SwiftUI
 
 struct CategoryFilterView: View {
-    // Selected category is still controlled by parent
     @Binding var selectedCategory: String?
 
-    // Local state
     @State private var categories: [String] = []
     @State private var isLoading = false
     @State private var errorMessage: String? = nil
 
-    // Optional: include a synthetic "Wszystkie" chip
     private let includeAllChip = true
     private let allLabel = "Wszystkie"
 
@@ -40,7 +37,6 @@ struct CategoryFilterView: View {
                     HStack(spacing: 12) {
                         ForEach(displayedCategories, id: \.self) { category in
                             Button(action: {
-                                // Toggle selection
                                 if selectedCategory == normalized(category) || (includeAllChip && category == allLabel) {
                                     selectedCategory = nil
                                 } else {
@@ -75,7 +71,6 @@ struct CategoryFilterView: View {
     }
 
     private func isSelected(_ label: String) -> Bool {
-        // "Wszystkie" is selected when selectedCategory == nil
         if includeAllChip && label == allLabel { return selectedCategory == nil }
         return selectedCategory == normalized(label)
     }
@@ -90,14 +85,12 @@ struct CategoryFilterView: View {
         defer { isLoading = false }
 
         do {
-            // Try dedicated product_category table first
             let names1: [String] = try await fetchCategoryNamesFromCategoryTable()
             if !names1.isEmpty {
                 categories = uniqueSorted(names1)
                 return
             }
 
-            // Fallback: read via products join (product_category_id)
             let names2: [String] = try await fetchCategoryNamesFromProductsJoin()
             categories = uniqueSorted(names2)
         } catch {
@@ -118,7 +111,6 @@ private struct ProductCategoryEmbed: Decodable { let name: String }
 private struct ProductWithCategoryRow: Decodable { let product_category: ProductCategoryEmbed? }
 
 private extension CategoryFilterView {
-    /// Reads names from the dedicated product_category table.
     func fetchCategoryNamesFromCategoryTable() async throws -> [String] {
         let client = SupabaseManager.shared.client
         let rows: [CategoryNameRow] = try await client
@@ -129,7 +121,6 @@ private extension CategoryFilterView {
         return rows.map { $0.name }
     }
 
-    /// Fallback: reads names by joining products -> product_category via product_category_id
     func fetchCategoryNamesFromProductsJoin() async throws -> [String] {
         let client = SupabaseManager.shared.client
         let rows: [ProductWithCategoryRow] = try await client

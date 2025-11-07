@@ -143,7 +143,6 @@ struct ShoppingListDetailView: View {
     private func submitSheet() async {
         guard let pid = Int(inputProductId), let qty = Double(inputQuantity), qty > 0 else { return }
         if isEditing, let original = editingProductId {
-            // If product id changed, we delete old and insert new; else update count
             if original != pid {
                 await viewModel.deleteItem(productId: original)
                 await viewModel.addItem(productId: pid, quantity: qty)

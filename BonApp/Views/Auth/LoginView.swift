@@ -49,7 +49,6 @@ struct LoginView: View {
                         }
 
                     if let errorKey = auth.errorMessage {
-                        // Show raw error text (not as a localization key) for clearer diagnostics
                         Text(errorKey)
                             .foregroundColor(Color("logout"))
                     }

@@ -179,7 +179,6 @@ struct AddRecipeView: View {
     }
 
     private func saveRecipe() async {
-        // Prefer ID from loaded profile, but fall back to Auth session if profile isn't loaded yet
         var userUUID: UUID?
         if let idStr = auth.currentUser?.id, let u = UUID(uuidString: idStr) {
             userUUID = u
@@ -199,18 +198,15 @@ struct AddRecipeView: View {
         let cookTimeInt = Int(cookTime.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
 
         do {
-            // 1) Upload image if provided
             var imageURL: String? = nil
             if let img = selectedImage, let data = img.jpegData(compressionQuality: 0.85) {
                 let path = "\(ownerId.uuidString)/recipes/\(recipeId).jpg"
                 _ = try await client.storage
                     .from("recipe-images")
                     .upload(path, data: data, options: FileOptions(cacheControl: "3600", contentType: "image/jpeg", upsert: true))
-                // Public URL (assuming bucket is public). If not public, you can create a signed URL.
                 imageURL = try client.storage.from("recipe-images").getPublicURL(path: path).absoluteString
             }
 
-            // 2) Insert recipe (steps kept as a JSONB list)
             let recipeInsert = RecipeInsertPayload(
                 id: recipeId,
                 title: title,
