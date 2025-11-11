@@ -10,6 +10,7 @@ import SwiftUI
 @main
 struct BonAppApp: App {
     @StateObject private var auth = AuthViewModel()
+    @StateObject private var recipeVM = RecipeViewModel()
     @Environment(\.scenePhase) private var scenePhase
 
     @AppStorage("appAppearance") private var appAppearanceRaw = AppAppearance.system.rawValue
@@ -19,6 +20,7 @@ struct BonAppApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(auth)
+                .environmentObject(recipeVM)
                 .preferredColorScheme(appearance.colorScheme)
                 .task {
                     await auth.clearSessionOnLaunch()

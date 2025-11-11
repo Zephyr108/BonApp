@@ -81,7 +81,6 @@ private struct ProductInRecipeInsert: Encodable {
     let recipe_id: UUID
     let product_id: Int
     let quantity: Double
-    let unit: String?
 }
 
 final class RecipeViewModel: ObservableObject {
@@ -161,64 +160,7 @@ final class RecipeViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Add (legacy)
-    @MainActor
-    func addRecipe(
-        title: String,
-        description: String,
-        _ ingredients: [String] = [],
-        prepare_time: Int,
-        imageData: Data?,
-        visibility: Bool,
-        user_id: String
-    ) async {
-        guard !isLoading else { return }
-        isLoading = true
-        error = nil
-        defer { isLoading = false }
-
-        let recipeId = UUID()
-        var uploadedPath: String? = nil
-        var photoURL: String? = nil
-
-        do {
-            if let data = imageData {
-                let path = "\(user_id)/recipes/\(recipeId).jpg"
-                _ = try await client.storage
-                    .from("recipes")
-                    .upload(path, data: data, options: FileOptions(cacheControl: "3600", contentType: "image/jpeg", upsert: true))
-                uploadedPath = path
-                photoURL = try client.storage.from("recipes").getPublicURL(path: path).absoluteString
-            }
-
-            let payload = RecipeInsert(
-                id: recipeId,
-                title: title,
-                description: description,
-                prepare_time: prepare_time,
-                photo: photoURL,
-                visibility: visibility,
-                user_id: user_id,
-                steps_list: []
-            )
-
-            _ = try await client
-                .from("recipe")
-                .insert(payload)
-                .execute()
-
-            await fetchRecipes()
-        } catch {
-            if let path = uploadedPath {
-                try? await client.storage.from("recipes").remove(paths: [path])
-            }
-            self.error = error.localizedDescription
-        }
-    }
-
-    // MARK: - Add (full: recipe + categories + ingredients + steps)
-    /// Tworzy kompletny przepis wraz z kategoriami i składnikami.
-    /// Zwraca UUID nowego przepisu (i zapisuje go też w lastCreatedRecipeId).
+    // MARK: - Add
     @MainActor
     func addRecipeFull(
         title: String,
@@ -263,10 +205,10 @@ final class RecipeViewModel: ObservableObject {
             if let data = imageData {
                 let path = "\(uid)/recipes/\(recipeId).jpg"
                 _ = try await client.storage
-                    .from("recipes")
+                    .from("recipe-images")
                     .upload(path, data: data, options: FileOptions(cacheControl: "3600", contentType: "image/jpeg", upsert: true))
                 uploadedPath = path
-                photoURL = try client.storage.from("recipes").getPublicURL(path: path).absoluteString
+                photoURL = try client.storage.from("recipe-images").getPublicURL(path: path).absoluteString
             }
 
             // 1) recipe (wraz z steps_list)
@@ -300,8 +242,7 @@ final class RecipeViewModel: ObservableObject {
                     ProductInRecipeInsert(
                         recipe_id: recipeId,
                         product_id: item.product_id,
-                        quantity: item.quantity,
-                        unit: (item.unit?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true) ? nil : item.unit
+                        quantity: item.quantity
                     )
                 }
                 _ = try await client
@@ -317,7 +258,7 @@ final class RecipeViewModel: ObservableObject {
         } catch {
             // rollback zdjęcia w razie błędu
             if let path = uploadedPath {
-                try? await client.storage.from("recipes").remove(paths: [path])
+                try? await client.storage.from("recipe-images").remove(paths: [path])
             }
             self.error = error.localizedDescription
             throw error
@@ -343,10 +284,10 @@ final class RecipeViewModel: ObservableObject {
             if let data = newImageData {
                 let path = "\(user_id)/recipes/\(id).jpg"
                 _ = try await client.storage
-                    .from("recipes")
+                    .from("recipe-images")
                     .upload(path, data: data, options: FileOptions(cacheControl: "3600", contentType: "image/jpeg", upsert: true))
                 uploadedPath = path
-                let publicURL = try client.storage.from("recipes").getPublicURL(path: path).absoluteString
+                let publicURL = try client.storage.from("recipe-images").getPublicURL(path: path).absoluteString
                 payloadWithPhoto = RecipeUpdateWithPhoto(
                     description: description,
                     prepare_time: prepare_time,
@@ -392,7 +333,7 @@ final class RecipeViewModel: ObservableObject {
 
             if let uid = currentUserId {
                 let path = "\(uid)/recipes/\(id).jpg"
-                try? await client.storage.from("recipes").remove(paths: [path])
+                try? await client.storage.from("recipe-images").remove(paths: [path])
             }
 
             await fetchRecipes()

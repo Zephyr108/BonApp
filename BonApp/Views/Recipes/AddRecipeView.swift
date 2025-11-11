@@ -45,7 +45,7 @@ struct AddRecipeView: View {
     @State private var selectedProduct: ProductLookup? = nil
     @State private var ingredients: [NewRecipeProduct] = []
 
-    @State private var showCategoryPicker: Bool = false
+    @State private var showCategorySheet: Bool = false
 
     struct Category: Identifiable, Decodable { let id: Int; let name: String }
     struct ProductLookup: Identifiable, Decodable { let id: Int; let name: String; let unit: String? }
@@ -140,7 +140,7 @@ struct AddRecipeView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
 
                         Button {
-                            withAnimation { showCategoryPicker.toggle() }
+                            showCategorySheet = true
                         } label: {
                             HStack {
                                 if selectedCategoryIds.isEmpty {
@@ -153,37 +153,13 @@ struct AddRecipeView: View {
                                         .lineLimit(2)
                                 }
                                 Spacer()
-                                Image(systemName: showCategoryPicker ? "chevron.up" : "chevron.down")
+                                Image(systemName: "chevron.down")
                                     .foregroundColor(Color("textSecondary"))
                             }
                             .padding(16)
                             .background(Color("textfieldBackground"))
                             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
                             .cornerRadius(8)
-                        }
-
-                        if showCategoryPicker {
-                            VStack(spacing: 8) {
-                                ForEach(allCategories) { cat in
-                                    Button(action: {
-                                        if selectedCategoryIds.contains(cat.id) { selectedCategoryIds.remove(cat.id) }
-                                        else { selectedCategoryIds.insert(cat.id) }
-                                    }) {
-                                        HStack {
-                                            Text(cat.name).foregroundColor(Color("textPrimary"))
-                                            Spacer()
-                                            if selectedCategoryIds.contains(cat.id) {
-                                                Image(systemName: "checkmark")
-                                                    .foregroundColor(.blue)
-                                            }
-                                        }
-                                    }
-                                    .padding(12)
-                                    .background(Color("textfieldBackground"))
-                                    .cornerRadius(8)
-                                }
-                            }
-                            .transition(.opacity.combined(with: .move(edge: .top)))
                         }
                     }
                     .padding(.bottom, 12)
@@ -271,8 +247,9 @@ struct AddRecipeView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
 
                         ForEach(stepTexts.indices, id: \.self) { idx in
-                            Text("Krok \(idx+1): \(stepTexts[idx])")
-                                .foregroundColor(Color("textPrimary"))
+                            HBoxStepRow(index: idx, text: $stepTexts[idx]) {
+                                stepTexts.remove(at: idx)
+                            }
                         }
 
                         HStack {
@@ -315,8 +292,32 @@ struct AddRecipeView: View {
             .sheet(isPresented: $isShowingImagePicker) {
                 ImagePicker(image: $selectedImage)
             }
+            .sheet(isPresented: $showCategorySheet) {
+                NavigationStack {
+                    List {
+                        ForEach(allCategories) { cat in
+                            HStack {
+                                Text(cat.name)
+                                Spacer()
+                                if selectedCategoryIds.contains(cat.id) { Image(systemName: "checkmark").foregroundColor(.blue) }
+                            }
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                if selectedCategoryIds.contains(cat.id) { selectedCategoryIds.remove(cat.id) }
+                                else { selectedCategoryIds.insert(cat.id) }
+                            }
+                        }
+                    }
+                    .navigationTitle("Kategorie")
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) { Button("Zamknij") { showCategorySheet = false } }
+                        ToolbarItem(placement: .confirmationAction) { Button("Gotowe") { showCategorySheet = false } }
+                    }
+                    .task { if allCategories.isEmpty { await loadCategories() } }
+                }
+            }
         }
-        .task { await loadCategories(); await loadAllProducts() }
+        .task { await loadAllProducts() }
     }
 
     private var canSave: Bool {
@@ -378,6 +379,25 @@ struct AddRecipeView_Previews: PreviewProvider {
         NavigationStack {
             AddRecipeView()
                 .environmentObject(AuthViewModel())
+                .environmentObject(RecipeViewModel())
         }
+    }
+}
+
+private struct HBoxStepRow: View {
+    let index: Int
+    @Binding var text: String
+    var onDelete: () -> Void
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text("Krok \(index+1):")
+                .foregroundColor(Color("textSecondary"))
+            TextField("Treść kroku", text: $text)
+                .textFieldStyle(.roundedBorder)
+            Button(role: .destructive, action: onDelete) {
+                Image(systemName: "trash")
+            }
+        }
+        .padding(.vertical, 4)
     }
 }
