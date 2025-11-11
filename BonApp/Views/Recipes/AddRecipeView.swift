@@ -20,6 +20,7 @@ private struct RecipeInsertPayload: Encodable {
 
 struct AddRecipeView: View {
     @EnvironmentObject var auth: AuthViewModel
+    @EnvironmentObject var recipeVM: RecipeViewModel
     @Environment(\.dismiss) private var dismiss
 
     @State private var title: String = ""
@@ -35,6 +36,19 @@ struct AddRecipeView: View {
 
     @State private var isSaving = false
     @State private var errorMessage: String? = nil
+
+    @State private var allCategories: [Category] = []
+    @State private var selectedCategoryIds: Set<Int> = []
+    @State private var allProducts: [ProductLookup] = []
+    @State private var productSearch: String = ""
+    @State private var ingredientQuantity: String = ""
+    @State private var selectedProduct: ProductLookup? = nil
+    @State private var ingredients: [NewRecipeProduct] = []
+
+    @State private var showCategoryPicker: Bool = false
+
+    struct Category: Identifiable, Decodable { let id: Int; let name: String }
+    struct ProductLookup: Identifiable, Decodable { let id: Int; let name: String; let unit: String? }
 
     var body: some View {
         NavigationStack {
@@ -120,6 +134,137 @@ struct AddRecipeView: View {
                     .padding(.bottom, 12)
 
                     Group {
+                        Text("Kategorie")
+                            .font(.headline)
+                            .foregroundColor(Color("textSecondary"))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        Button {
+                            withAnimation { showCategoryPicker.toggle() }
+                        } label: {
+                            HStack {
+                                if selectedCategoryIds.isEmpty {
+                                    Text("Wybierz kategorie")
+                                        .foregroundColor(Color("textSecondary"))
+                                } else {
+                                    let names = allCategories.filter { selectedCategoryIds.contains($0.id) }.map { $0.name }
+                                    Text(names.joined(separator: ", "))
+                                        .foregroundColor(Color("textPrimary"))
+                                        .lineLimit(2)
+                                }
+                                Spacer()
+                                Image(systemName: showCategoryPicker ? "chevron.up" : "chevron.down")
+                                    .foregroundColor(Color("textSecondary"))
+                            }
+                            .padding(16)
+                            .background(Color("textfieldBackground"))
+                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
+                            .cornerRadius(8)
+                        }
+
+                        if showCategoryPicker {
+                            VStack(spacing: 8) {
+                                ForEach(allCategories) { cat in
+                                    Button(action: {
+                                        if selectedCategoryIds.contains(cat.id) { selectedCategoryIds.remove(cat.id) }
+                                        else { selectedCategoryIds.insert(cat.id) }
+                                    }) {
+                                        HStack {
+                                            Text(cat.name).foregroundColor(Color("textPrimary"))
+                                            Spacer()
+                                            if selectedCategoryIds.contains(cat.id) {
+                                                Image(systemName: "checkmark")
+                                                    .foregroundColor(.blue)
+                                            }
+                                        }
+                                    }
+                                    .padding(12)
+                                    .background(Color("textfieldBackground"))
+                                    .cornerRadius(8)
+                                }
+                            }
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
+                    }
+                    .padding(.bottom, 12)
+
+                    Group {
+                        Text("Składniki")
+                            .font(.headline)
+                            .foregroundColor(Color("textSecondary"))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        TextField("Szukaj produktu", text: $productSearch)
+                            .padding(12)
+                            .background(Color("textfieldBackground"))
+                            .cornerRadius(8)
+
+                        let query = productSearch.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if query.count >= 1 {
+                            ForEach(allProducts.filter { $0.name.lowercased().contains(query.lowercased()) }.prefix(5)) { prod in
+                                Button {
+                                    selectedProduct = prod
+                                    // przenieś nazwę do wiersza z ilością
+                                    productSearch = ""
+                                } label: {
+                                    HStack {
+                                        Text(prod.name)
+                                            .foregroundColor(.blue)
+                                        Spacer()
+                                        Text(prod.unit ?? "")
+                                            .foregroundColor(Color("textSecondary"))
+                                    }
+                                }
+                                .padding(8)
+                            }
+                        }
+
+                        if let p = selectedProduct {
+                            HStack(spacing: 12) {
+                                Text(p.name)
+                                    .foregroundColor(Color("textPrimary"))
+                                    .lineLimit(1)
+                                Spacer(minLength: 8)
+                                TextField("Ilość", text: $ingredientQuantity)
+                                    .keyboardType(.decimalPad)
+                                    .frame(width: 80)
+                                    .padding(8)
+                                    .background(Color("textfieldBackground"))
+                                    .cornerRadius(8)
+                                Text(p.unit ?? "")
+                                    .foregroundColor(Color("textSecondary"))
+                                Button("Dodaj") {
+                                    if let q = Double(ingredientQuantity.replacingOccurrences(of: ",", with: ".")), q > 0 {
+                                        ingredients.append(NewRecipeProduct(product_id: p.id, quantity: q, unit: p.unit))
+                                        selectedProduct = nil
+                                        ingredientQuantity = ""
+                                    }
+                                }
+                                .buttonStyle(.borderedProminent)
+                            }
+                            .padding(8)
+                        }
+
+                        if !ingredients.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                ForEach(ingredients.indices, id: \.self) { idx in
+                                    HStack {
+                                        let ing = ingredients[idx]
+                                        let prodName = allProducts.first(where: { $0.id == ing.product_id })?.name ?? "#\( ing.product_id )"
+                                        Text("• \(prodName)  \(String(format: "%.2f", ing.quantity)) \(ing.unit ?? "")")
+                                            .foregroundColor(Color("textPrimary"))
+                                            .lineLimit(1)
+                                        Spacer()
+                                        Button(role: .destructive) { ingredients.remove(at: idx) } label: { Image(systemName: "trash") }
+                                    }
+                                }
+                            }
+                            .padding(.top, 4)
+                        }
+                    }
+                    .padding(.bottom, 12)
+
+                    Group {
                         Text("Kroki")
                             .font(.headline)
                             .foregroundColor(Color("textSecondary"))
@@ -171,6 +316,7 @@ struct AddRecipeView: View {
                 ImagePicker(image: $selectedImage)
             }
         }
+        .task { await loadCategories(); await loadAllProducts() }
     }
 
     private var canSave: Bool {
@@ -193,40 +339,37 @@ struct AddRecipeView: View {
         errorMessage = nil
         defer { isSaving = false }
 
-        let client = SupabaseManager.shared.client
-        let recipeId = UUID()
         let cookTimeInt = Int(cookTime.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
 
         do {
-            var imageURL: String? = nil
-            if let img = selectedImage, let data = img.jpegData(compressionQuality: 0.85) {
-                let path = "\(ownerId.uuidString)/recipes/\(recipeId).jpg"
-                _ = try await client.storage
-                    .from("recipe-images")
-                    .upload(path, data: data, options: FileOptions(cacheControl: "3600", contentType: "image/jpeg", upsert: true))
-                imageURL = try client.storage.from("recipe-images").getPublicURL(path: path).absoluteString
-            }
-
-            let recipeInsert = RecipeInsertPayload(
-                id: recipeId,
+            let imageData = selectedImage?.jpegData(compressionQuality: 0.85)
+            let id = try await recipeVM.addRecipeFull(
                 title: title,
                 description: detail,
+                steps: stepTexts,
                 prepare_time: cookTimeInt,
-                steps_list: stepTexts,
+                imageData: imageData,
                 visibility: isPublic,
-                photo: imageURL,
-                user_id: ownerId
+                categoryIds: Array(selectedCategoryIds),
+                items: ingredients
             )
-
-            _ = try await client
-                .from("recipe")
-                .insert(recipeInsert)
-                .execute()
-
             await MainActor.run { dismiss() }
         } catch {
             await MainActor.run { errorMessage = error.localizedDescription }
         }
+    }
+
+    private func loadCategories() async {
+        do {
+            let result: [Category] = try await SupabaseManager.shared.client.from("category").select().execute().value
+            await MainActor.run { allCategories = result }
+        } catch {}
+    }
+    private func loadAllProducts() async {
+        do {
+            let result: [ProductLookup] = try await SupabaseManager.shared.client.from("product").select().execute().value
+            await MainActor.run { allProducts = result }
+        } catch {}
     }
 }
 

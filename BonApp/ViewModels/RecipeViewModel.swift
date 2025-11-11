@@ -28,6 +28,12 @@ struct RecipeStepDTO: Identifiable, Hashable, Decodable {
     }
 }
 
+struct NewRecipeProduct: Encodable {
+    let product_id: Int
+    let quantity: Double
+    let unit: String?
+}
+
 private struct RecipeInsert: Encodable {
     let id: UUID
     let title: String
@@ -66,15 +72,34 @@ private struct StepInsert: Encodable {
     let instruction: String
 }
 
+private struct RecipeCategoryInsert: Encodable {
+    let recipe_id: UUID
+    let category_id: Int
+}
+
+private struct ProductInRecipeInsert: Encodable {
+    let recipe_id: UUID
+    let product_id: Int
+    let quantity: Double
+    let unit: String?
+}
+
 final class RecipeViewModel: ObservableObject {
     @Published var recipes: [RecipeDTO] = []
     @Published var isLoading: Bool = false
     @Published var error: String? = nil
     @Published var myRecipes: [RecipeDTO] = []
     @Published var otherRecipes: [RecipeDTO] = []
+    @Published var lastCreatedRecipeId: UUID? = nil
 
     private let client = SupabaseManager.shared.client
     private let currentUserId: String?
+
+    private func resolveCurrentUserId() async -> String? {
+        if let uid = currentUserId, !uid.isEmpty { return uid }
+        if let session = try? await client.auth.session { return session.user.id.uuidString }
+        return nil
+    }
 
     // MARK: - Init
     init(currentUserId: String? = nil) {
@@ -136,7 +161,7 @@ final class RecipeViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Add
+    // MARK: - Add (legacy)
     @MainActor
     func addRecipe(
         title: String,
@@ -188,6 +213,114 @@ final class RecipeViewModel: ObservableObject {
                 try? await client.storage.from("recipes").remove(paths: [path])
             }
             self.error = error.localizedDescription
+        }
+    }
+
+    // MARK: - Add (full: recipe + categories + ingredients + steps)
+    /// Tworzy kompletny przepis wraz z kategoriami i składnikami.
+    /// Zwraca UUID nowego przepisu (i zapisuje go też w lastCreatedRecipeId).
+    @MainActor
+    func addRecipeFull(
+        title: String,
+        description: String?,
+        steps: [String],
+        prepare_time: Int,
+        imageData: Data?,
+        visibility: Bool,
+        categoryIds: [Int],
+        items: [NewRecipeProduct]
+    ) async throws -> UUID {
+        guard !isLoading else { throw NSError(domain: "Recipe", code: 1, userInfo: [NSLocalizedDescriptionKey: "Trwa zapisywanie"]) }
+        isLoading = true
+        error = nil
+        defer { isLoading = false }
+
+        // Walidacja
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty else {
+            let err = "Podaj tytuł przepisu"
+            self.error = err
+            throw NSError(domain: "Recipe", code: 2, userInfo: [NSLocalizedDescriptionKey: err])
+        }
+        guard !items.isEmpty else {
+            let err = "Dodaj przynajmniej jeden składnik"
+            self.error = err
+            throw NSError(domain: "Recipe", code: 3, userInfo: [NSLocalizedDescriptionKey: err])
+        }
+
+        guard let uid = await resolveCurrentUserId() else {
+            let err = "Brak zalogowanego użytkownika"
+            self.error = err
+            throw NSError(domain: "Recipe", code: 4, userInfo: [NSLocalizedDescriptionKey: err])
+        }
+
+        let recipeId = UUID()
+        var uploadedPath: String? = nil
+        var photoURL: String? = nil
+
+        do {
+            // (opcjonalnie) upload zdjęcia – zachowujemy identyczny bucket/nazewnictwo jak w wersji legacy
+            if let data = imageData {
+                let path = "\(uid)/recipes/\(recipeId).jpg"
+                _ = try await client.storage
+                    .from("recipes")
+                    .upload(path, data: data, options: FileOptions(cacheControl: "3600", contentType: "image/jpeg", upsert: true))
+                uploadedPath = path
+                photoURL = try client.storage.from("recipes").getPublicURL(path: path).absoluteString
+            }
+
+            // 1) recipe (wraz z steps_list)
+            let insert = RecipeInsert(
+                id: recipeId,
+                title: trimmedTitle,
+                description: description ?? "",
+                prepare_time: prepare_time,
+                photo: photoURL,
+                visibility: visibility,
+                user_id: uid,
+                steps_list: steps
+            )
+            _ = try await client
+                .from("recipe")
+                .insert(insert)
+                .execute()
+
+            // 2) recipe_category (jeśli wybrano)
+            if !categoryIds.isEmpty {
+                let catPayload = categoryIds.map { RecipeCategoryInsert(recipe_id: recipeId, category_id: $0) }
+                _ = try await client
+                    .from("recipe_category")
+                    .insert(catPayload)
+                    .execute()
+            }
+
+            // 3) product_in_recipe (jeśli są składniki)
+            if !items.isEmpty {
+                let prodPayload = items.map { item in
+                    ProductInRecipeInsert(
+                        recipe_id: recipeId,
+                        product_id: item.product_id,
+                        quantity: item.quantity,
+                        unit: (item.unit?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true) ? nil : item.unit
+                    )
+                }
+                _ = try await client
+                    .from("product_in_recipe")
+                    .insert(prodPayload)
+                    .execute()
+            }
+
+            // sukces
+            self.lastCreatedRecipeId = recipeId
+            await fetchRecipes()
+            return recipeId
+        } catch {
+            // rollback zdjęcia w razie błędu
+            if let path = uploadedPath {
+                try? await client.storage.from("recipes").remove(paths: [path])
+            }
+            self.error = error.localizedDescription
+            throw error
         }
     }
 
