@@ -72,10 +72,30 @@ struct RecipeDetailItem: Identifiable, Hashable, Decodable {
     }
 }
 
+struct IngredientRow: Identifiable, Decodable, Hashable {
+    let product_id: Int
+    let quantity: Double
+    let product: ProductMini
+    var id: Int { product_id }
+
+    struct ProductMini: Decodable, Hashable {
+        let name: String
+        let unit: String?
+    }
+}
+
+struct CategoryRow: Identifiable, Decodable, Hashable {
+    let category: CategoryMini
+    var id: String { category.name }
+    struct CategoryMini: Decodable, Hashable { let name: String }
+}
+
 struct RecipeDetailView: View {
     let recipe: RecipeDetailItem
     @EnvironmentObject var auth: AuthViewModel
     @State private var loadedSteps: [RecipeStepItem] = []
+    @State private var loadedIngredients: [IngredientRow] = []
+    @State private var loadedCategories: [String] = []
 
     var body: some View {
         ZStack {
@@ -102,6 +122,22 @@ struct RecipeDetailView: View {
                         .font(.subheadline)
                         .foregroundColor(Color("textSecondary"))
 
+                    if !loadedCategories.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(loadedCategories, id: \.self) { name in
+                                    Text(name)
+                                        .font(.caption)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 6)
+                                        .background(Color("textfieldBackground"))
+                                        .foregroundColor(Color("textPrimary"))
+                                        .cornerRadius(12)
+                                }
+                            }
+                        }
+                    }
+
                     if let detail = recipe.detail, !detail.isEmpty {
                         Text(detail)
                             .font(.body)
@@ -113,9 +149,23 @@ struct RecipeDetailView: View {
                     Text("Składniki")
                         .font(.headline)
                         .foregroundColor(Color("textSecondary"))
-                    ForEach(recipe.ingredients, id: \.self) { ingredient in
-                        Text("• \(ingredient)")
-                            .foregroundColor(Color("textPrimary"))
+                    if !loadedIngredients.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(loadedIngredients) { row in
+                                let qty = formatQuantity(row.quantity)
+                                let unit = formatUnit(row.product.unit)
+                                Text("• \(qty) \(unit) \(row.product.name)")
+                                    .foregroundColor(Color("textPrimary"))
+                            }
+                        }
+                    } else if !recipe.ingredients.isEmpty {
+                        ForEach(recipe.ingredients, id: \.self) { ingredient in
+                            Text("• \(ingredient)")
+                                .foregroundColor(Color("textPrimary"))
+                        }
+                    } else {
+                        Text("Brak składników")
+                            .foregroundColor(Color("textSecondary"))
                     }
 
                     Divider()
@@ -163,9 +213,9 @@ struct RecipeDetailView: View {
             }
         }
         .task {
-            if recipe.steps.isEmpty {
-                await loadStepsFromDB()
-            }
+            if recipe.steps.isEmpty { await loadStepsFromDB() }
+            await loadIngredientsFromDB()
+            await loadCategoriesFromDB()
         }
     }
 
@@ -197,6 +247,52 @@ struct RecipeDetailView: View {
             }
         } catch {
             print("[RecipeDetailView] loadStepsFromDB error:", error)
+        }
+    }
+
+    private func loadIngredientsFromDB() async {
+        do {
+            let rows: [IngredientRow] = try await SupabaseManager.shared.client
+                .from("product_in_recipe")
+                .select("product_id, quantity, product:product_id(name,unit)")
+                .eq("recipe_id", value: recipe.id)
+                .execute()
+                .value
+            await MainActor.run { self.loadedIngredients = rows }
+        } catch {
+            print("[RecipeDetailView] loadIngredientsFromDB error:", error)
+        }
+    }
+
+    private func loadCategoriesFromDB() async {
+        do {
+            let rows: [CategoryRow] = try await SupabaseManager.shared.client
+                .from("recipe_category")
+                .select("category:category_id(name)")
+                .eq("recipe_id", value: recipe.id)
+                .execute()
+                .value
+            let names = rows.map { $0.category.name }
+            await MainActor.run { self.loadedCategories = names }
+        } catch {
+            print("[RecipeDetailView] loadCategoriesFromDB error:", error)
+        }
+    }
+
+    private func formatQuantity(_ q: Double) -> String {
+        if q.rounded() == q { return String(Int(q)) }
+        return String(format: "%.2f", q)
+    }
+
+    private func formatUnit(_ u: String?) -> String {
+        guard let raw = u?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else { return "" }
+        switch raw.lowercased() {
+        case "g", "gram", "grams": return "g"
+        case "kg", "kilogram", "kilograms": return "kg"
+        case "ml", "milliliter", "milliliters": return "ml"
+        case "l", "liter", "liters": return "l"
+        case "szt", "szt.", "sztuka", "piece", "pcs": return "szt."
+        default: return raw
         }
     }
 
