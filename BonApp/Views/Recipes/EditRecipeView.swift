@@ -42,6 +42,10 @@ private struct EditIngredientRow: Decodable {
     let quantity: Double
 }
 
+private struct EditRecipeStepsRow: Decodable {
+    let steps_list: [String]?
+}
+
 private struct EditRecipeCategoryRow: Decodable {
     let category_id: Int
 }
@@ -443,6 +447,7 @@ struct EditRecipeView: View {
             await loadRecipeCategories()
             await loadAllProducts()
             await loadExistingIngredients()
+            await loadExistingSteps()
         }
         .navigationTitle("Edytuj przepis")
     }
@@ -630,6 +635,26 @@ struct EditRecipeView: View {
             await MainActor.run { self.ingredients = mapped }
         } catch {
             print("[EditRecipeView] loadExistingIngredients error:", error)
+        }
+    }
+
+    private func loadExistingSteps() async {
+        do {
+            let rows: [EditRecipeStepsRow] = try await SupabaseManager.shared.client
+                .from("recipe")
+                .select("steps_list")
+                .eq("id", value: recipeId)
+                .limit(1)
+                .execute()
+                .value
+
+            if let first = rows.first, let steps = first.steps_list {
+                await MainActor.run {
+                    self.stepTexts = steps
+                }
+            }
+        } catch {
+            print("[EditRecipeView] loadExistingSteps error:", error)
         }
     }
 }
