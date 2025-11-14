@@ -1,3 +1,10 @@
+private struct PhotoNullPayload: Encodable {
+    enum CodingKeys: String, CodingKey { case photo }
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeNil(forKey: .photo)
+    }
+}
 import UIKit
 import SwiftUI
 import Foundation
@@ -468,6 +475,7 @@ struct EditRecipeView: View {
         defer { isSaving = false }
 
         let client = SupabaseManager.shared.client
+        var shouldClearPhoto = false
         let cookTimeInt = Int(cookTime.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
         let stepsArray = stepTexts
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -483,7 +491,14 @@ struct EditRecipeView: View {
                 newImageURL = try client.storage.from("recipe-images").getPublicURL(path: path).absoluteString
                 imageRemoved = false
             } else if imageRemoved {
+                // użytkownik usunął zdjęcie – wyczyść URL i oznacz kolumnę do ustawienia na NULL
                 newImageURL = nil
+                shouldClearPhoto = true
+                // opcjonalnie usuń plik ze storage
+                do {
+                    let path = "\(recipeId)/image.jpg"
+                    _ = try? await client.storage.from("recipe-images").remove(paths: [path])
+                }
             }
 
             let updatePayload = RecipeUpdatePayload(
@@ -501,6 +516,16 @@ struct EditRecipeView: View {
                 .eq("id", value: recipeId)
                 .eq("user_id", value: auth.currentUser?.id ?? "")
                 .execute()
+
+            if shouldClearPhoto {
+                let clearPayload = PhotoNullPayload()
+                _ = try await client
+                    .from("recipe")
+                    .update(clearPayload)
+                    .eq("id", value: recipeId)
+                    .eq("user_id", value: auth.currentUser?.id ?? "")
+                    .execute()
+            }
 
             // Update categories for this recipe
             do {
