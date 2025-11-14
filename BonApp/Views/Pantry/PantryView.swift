@@ -78,12 +78,14 @@ final class PantryScreenViewModel: ObservableObject {
     func deleteItems(with ids: Set<UUID>) async {
         guard !ids.isEmpty else { return }
         do {
-            _ = try await client
-                .from("pantry")
-                .delete()
-                .in("id", values: Array(ids))
-                .eq("user_id", value: userId ?? "")
-                .execute()
+            for id in ids {
+                _ = try await client
+                    .from("pantry")
+                    .delete()
+                    .eq("id", value: id)
+                    .eq("user_id", value: userId ?? "")
+                    .execute()
+            }
             await refresh()
         } catch {
             await MainActor.run { self.error = error.localizedDescription }
@@ -95,7 +97,6 @@ final class PantryScreenViewModel: ObservableObject {
 struct PantryView: View {
     @EnvironmentObject var auth: AuthViewModel
     @StateObject private var viewModel = PantryScreenViewModel()
-    @State private var isShowingAdd = false
     @State private var selectedIds: Set<UUID> = []
     @State private var isSelecting = false
 
@@ -175,13 +176,12 @@ struct PantryView: View {
                 viewModel.setUserId(new)
                 Task { await viewModel.refresh() }
             }
-            .onChange(of: isShowingAdd, initial: false) { old, new in
-                if new == false { Task { await viewModel.refresh() } }
-            }
             .navigationTitle("Spiżarnia")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { isShowingAdd = true }) {
+                    NavigationLink {
+                        AddPantryItemView()
+                    } label: {
                         Image(systemName: "plus")
                     }
                 }
@@ -218,9 +218,6 @@ struct PantryView: View {
                         }
                     }
                 }
-            }
-            .sheet(isPresented: $isShowingAdd) {
-                AddPantryItemView()
             }
         }
     }
