@@ -90,12 +90,17 @@ struct CategoryRow: Identifiable, Decodable, Hashable {
     struct CategoryMini: Decodable, Hashable { let name: String }
 }
 
+private struct FavoriteRow: Decodable, Hashable {
+    let id: UUID
+}
+
 struct RecipeDetailView: View {
     let recipe: RecipeDetailItem
     @EnvironmentObject var auth: AuthViewModel
     @State private var loadedSteps: [RecipeStepItem] = []
     @State private var loadedIngredients: [IngredientRow] = []
     @State private var loadedCategories: [String] = []
+    @State private var isFavorite: Bool = false
 
     var body: some View {
         ZStack {
@@ -188,6 +193,29 @@ struct RecipeDetailView: View {
                             }
                         }
                     }
+                    
+                    if let user = auth.currentUser, user.id == recipe.userId {
+                        NavigationLink(destination: EditRecipeView(
+                            recipeId: recipe.id,
+                            title: recipe.title,
+                            detail: recipe.detail ?? "",
+                            cookTime: recipe.cookTime,
+                            isPublic: recipe.isPublic,
+                            steps: recipe.steps.map { $0.instruction },
+                            imageURL: recipe.imageURL
+                        )) {
+                            Text("Edytuj przepis")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(Color.accentColor)
+                                .foregroundColor(.white)
+                                .cornerRadius(14)
+                                .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+                                .padding(.top, 24)
+                                .padding(.bottom, 8)
+                        }
+                    }
                 }
                 .padding()
             }
@@ -195,19 +223,11 @@ struct RecipeDetailView: View {
         .navigationTitle("Szczegóły przepisu")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if let user = auth.currentUser, user.id == recipe.userId {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    NavigationLink(destination: EditRecipeView(
-                        recipeId: recipe.id,
-                        title: recipe.title,
-                        detail: recipe.detail ?? "",
-                        cookTime: recipe.cookTime,
-                        isPublic: recipe.isPublic,
-                        steps: recipe.steps.sorted { $0.order < $1.order }.map { $0.instruction },
-                        imageURL: recipe.imageURL
-                    )) {
-                        Text("Edytuj")
-                    }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: { toggleFavorite() }) {
+                    Image(systemName: isFavorite ? "heart.circle.fill" : "heart.circle")
+                        .font(.system(size: 24))
+                        .foregroundColor(isFavorite ? .red : Color("textPrimary"))
                 }
             }
         }
@@ -215,6 +235,7 @@ struct RecipeDetailView: View {
             if recipe.steps.isEmpty { await loadStepsFromDB() }
             await loadIngredientsFromDB()
             await loadCategoriesFromDB()
+            await loadFavoriteStatus()
         }
     }
 
@@ -275,6 +296,59 @@ struct RecipeDetailView: View {
             await MainActor.run { self.loadedCategories = names }
         } catch {
             print("[RecipeDetailView] loadCategoriesFromDB error:", error)
+        }
+    }
+
+    private func loadFavoriteStatus() async {
+        do {
+            let userId = auth.currentUser?.id ?? ""
+            guard !userId.isEmpty else {
+                await MainActor.run { isFavorite = false }
+                return
+            }
+            
+            let rows: [FavoriteRow] = try await SupabaseManager.shared.client
+                .from("favorite_recipe")
+                .select("id")
+                .eq("user_id", value: userId)
+                .eq("recipe_id", value: recipe.id)
+                .execute()
+                .value
+            
+            await MainActor.run { isFavorite = !rows.isEmpty }
+        } catch {
+            print("loadFavoriteStatus error:", error)
+        }
+    }
+
+    private struct NewFavorite: Encodable {
+        let user_id: String
+        let recipe_id: UUID
+    }
+
+    private func toggleFavorite() {
+        Task {
+            do {
+                let userId = auth.currentUser?.id ?? ""
+                if isFavorite {
+                    try await SupabaseManager.shared.client
+                        .from("favorite_recipe")
+                        .delete()
+                        .eq("user_id", value: userId)
+                        .eq("recipe_id", value: recipe.id)
+                        .execute()
+                    await MainActor.run { isFavorite = false }
+                } else {
+                    let payload = NewFavorite(user_id: userId, recipe_id: recipe.id)
+                    try await SupabaseManager.shared.client
+                        .from("favorite_recipe")
+                        .insert(payload)
+                        .execute()
+                    await MainActor.run { isFavorite = true }
+                }
+            } catch {
+                print("toggleFavorite error:", error)
+            }
         }
     }
 
