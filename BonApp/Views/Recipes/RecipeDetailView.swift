@@ -201,7 +201,6 @@ struct RecipeDetailView: View {
                         recipeId: recipe.id,
                         title: recipe.title,
                         detail: recipe.detail ?? "",
-                        ingredients: recipe.ingredients,
                         cookTime: recipe.cookTime,
                         isPublic: recipe.isPublic,
                         steps: recipe.steps.sorted { $0.order < $1.order }.map { $0.instruction },

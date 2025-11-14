@@ -5,11 +5,11 @@ import Supabase
 
 private struct RecipeUpdatePayload: Encodable {
     let title: String
-    let detail: String
-    let is_public: Bool
-    let cook_time: Int
-    let ingredients: [String]
-    let image_url: String?
+    let description: String
+    let visibility: Bool
+    let prepare_time: Int
+    let steps_list: [String]
+    let photo: String?
 }
 
 private struct RecipeStepInsert: Encodable {
@@ -19,6 +19,37 @@ private struct RecipeStepInsert: Encodable {
     let instruction: String
 }
 
+private struct EditCategory: Identifiable, Decodable {
+    let id: Int
+    let name: String
+}
+
+private struct EditProductLookup: Identifiable, Decodable {
+    let id: Int
+    let name: String
+    let unit: String?
+}
+
+private struct EditIngredientRow: Decodable {
+    let product_id: Int
+    let quantity: Double
+}
+
+private struct EditRecipeCategoryRow: Decodable {
+    let category_id: Int
+}
+
+private struct EditRecipeCategoryInsert: Encodable {
+    let recipe_id: UUID
+    let category_id: Int
+}
+
+private struct EditProductInRecipeInsert: Encodable {
+    let recipe_id: UUID
+    let product_id: Int
+    let quantity: Double
+}
+
 struct EditRecipeView: View {
     let recipeId: UUID
     @EnvironmentObject var auth: AuthViewModel
@@ -26,7 +57,6 @@ struct EditRecipeView: View {
 
     @State private var title: String
     @State private var detail: String
-    @State private var ingredientsText: String
     @State private var cookTime: String
     @State private var isPublic: Bool
 
@@ -38,13 +68,23 @@ struct EditRecipeView: View {
     @State private var isShowingImagePicker = false
     @State private var imageRemoved = false
 
+    @State private var allCategories: [EditCategory] = []
+    @State private var selectedCategoryIds: Set<Int> = []
+
+    @State private var allProducts: [EditProductLookup] = []
+    @State private var productSearch: String = ""
+    @State private var selectedProduct: EditProductLookup? = nil
+    @State private var ingredientQuantity: String = ""
+    @State private var ingredients: [NewRecipeProduct] = []
+
+    @State private var showCategorySheet: Bool = false
+
     @State private var isSaving = false
     @State private var errorMessage: String? = nil
 
     init(recipeId: UUID,
          title: String = "",
          detail: String = "",
-         ingredients: [String] = [],
          cookTime: Int = 0,
          isPublic: Bool = false,
          steps: [String] = [],
@@ -52,7 +92,6 @@ struct EditRecipeView: View {
         self.recipeId = recipeId
         _title = State(initialValue: title)
         _detail = State(initialValue: detail)
-        _ingredientsText = State(initialValue: ingredients.joined(separator: ", "))
         _cookTime = State(initialValue: String(cookTime))
         _isPublic = State(initialValue: isPublic)
         _stepTexts = State(initialValue: steps)
@@ -171,19 +210,6 @@ struct EditRecipeView: View {
                     }
                 }
 
-                Group {
-                    Text("Składniki (oddzielone przecinkami)")
-                        .font(.headline)
-                        .foregroundColor(Color("textSecondary"))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    TextField("Składniki", text: $ingredientsText)
-                        .foregroundColor(Color("textPrimary"))
-                        .padding(16)
-                        .background(Color("textfieldBackground"))
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
-                        .cornerRadius(8)
-                }
 
                 Group {
                     Text("Czas przygotowania (minuty)")
@@ -198,6 +224,116 @@ struct EditRecipeView: View {
                         .background(Color("textfieldBackground"))
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
                         .cornerRadius(8)
+                }
+
+                Group {
+                    Text("Kategorie")
+                        .font(.headline)
+                        .foregroundColor(Color("textSecondary"))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Button {
+                        showCategorySheet = true
+                    } label: {
+                        HStack {
+                            if selectedCategoryIds.isEmpty {
+                                Text("Wybierz kategorie")
+                                    .foregroundColor(Color("textSecondary"))
+                            } else {
+                                let names = allCategories
+                                    .filter { selectedCategoryIds.contains($0.id) }
+                                    .map { $0.name }
+                                Text(names.joined(separator: ", "))
+                                    .foregroundColor(Color("textPrimary"))
+                                    .lineLimit(2)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.down")
+                                .foregroundColor(Color("textSecondary"))
+                        }
+                        .padding(16)
+                        .background(Color("textfieldBackground"))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color("textfieldBorder"), lineWidth: 1))
+                        .cornerRadius(8)
+                    }
+                }
+
+                Group {
+                    Text("Składniki")
+                        .font(.headline)
+                        .foregroundColor(Color("textSecondary"))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    TextField("Szukaj produktu", text: $productSearch)
+                        .padding(12)
+                        .background(Color("textfieldBackground"))
+                        .cornerRadius(8)
+
+                    let query = productSearch.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if query.count >= 1 {
+                        ForEach(allProducts.filter { $0.name.lowercased().contains(query.lowercased()) }.prefix(5)) { prod in
+                            Button {
+                                selectedProduct = prod
+                                productSearch = ""
+                            } label: {
+                                HStack {
+                                    Text(prod.name)
+                                        .foregroundColor(.blue)
+                                    Spacer()
+                                    Text(prod.unit ?? "")
+                                        .foregroundColor(Color("textSecondary"))
+                                }
+                            }
+                            .padding(8)
+                        }
+                    }
+
+                    if let p = selectedProduct {
+                        HStack(spacing: 12) {
+                            Text(p.name)
+                                .foregroundColor(Color("textPrimary"))
+                                .lineLimit(1)
+                            Spacer(minLength: 8)
+                            TextField("Ilość", text: $ingredientQuantity)
+                                .keyboardType(.decimalPad)
+                                .frame(width: 80)
+                                .padding(8)
+                                .background(Color("textfieldBackground"))
+                                .cornerRadius(8)
+                            Text(p.unit ?? "")
+                                .foregroundColor(Color("textSecondary"))
+                            Button("Dodaj") {
+                                if let q = Double(ingredientQuantity.replacingOccurrences(of: ",", with: ".")), q > 0 {
+                                    ingredients.append(NewRecipeProduct(product_id: p.id, quantity: q, unit: p.unit))
+                                    selectedProduct = nil
+                                    ingredientQuantity = ""
+                                }
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                        .padding(8)
+                    }
+
+                    if !ingredients.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(ingredients.indices, id: \.self) { idx in
+                                HStack {
+                                    let ing = ingredients[idx]
+                                    let prod = allProducts.first(where: { $0.id == ing.product_id })
+                                    let name = prod?.name ?? "#\(ing.product_id)"
+                                    let unit = prod?.unit ?? ing.unit ?? ""
+                                    Text("• \(name)  \(String(format: "%.2f", ing.quantity)) \(unit)")
+                                        .foregroundColor(Color("textPrimary"))
+                                        .lineLimit(1)
+                                    Spacer()
+                                    Button(role: .destructive) { ingredients.remove(at: idx) } label: {
+                                        Image(systemName: "trash")
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.top, 4)
+                    }
                 }
 
                 Group {
@@ -263,7 +399,44 @@ struct EditRecipeView: View {
             .padding()
         }
         .background(Color("background").ignoresSafeArea())
-        .sheet(isPresented: $isShowingImagePicker) { ImagePicker(image: $selectedImage) }
+        .sheet(isPresented: $isShowingImagePicker) {
+            ImagePicker(image: $selectedImage)
+        }
+        .sheet(isPresented: $showCategorySheet) {
+            NavigationStack {
+                List {
+                    ForEach(allCategories) { cat in
+                        HStack {
+                            Text(cat.name)
+                            Spacer()
+                            if selectedCategoryIds.contains(cat.id) {
+                                Image(systemName: "checkmark").foregroundColor(.blue)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            if selectedCategoryIds.contains(cat.id) { selectedCategoryIds.remove(cat.id) }
+                            else { selectedCategoryIds.insert(cat.id) }
+                        }
+                    }
+                }
+                .navigationTitle("Kategorie")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Zamknij") { showCategorySheet = false }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Gotowe") { showCategorySheet = false }
+                    }
+                }
+            }
+        }
+        .task {
+            await loadAllCategories()
+            await loadRecipeCategories()
+            await loadAllProducts()
+            await loadExistingIngredients()
+        }
         .navigationTitle("Edytuj przepis")
     }
 
@@ -273,7 +446,16 @@ struct EditRecipeView: View {
     }
 
     private var placeholderImage: some View {
-        Rectangle().fill(Color.secondary.opacity(0.3)).frame(height: 180).cornerRadius(8)
+        ZStack {
+            Rectangle()
+                .fill(Color("textfieldBackground"))
+                .frame(height: 180)
+                .cornerRadius(8)
+
+            Image(systemName: "photo")
+                .font(.system(size: 40))
+                .foregroundColor(Color("textSecondary"))
+        }
     }
 
     private func saveChanges() async {
@@ -287,8 +469,7 @@ struct EditRecipeView: View {
 
         let client = SupabaseManager.shared.client
         let cookTimeInt = Int(cookTime.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
-        let ingredientsArray = ingredientsText
-            .split(separator: ",")
+        let stepsArray = stepTexts
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
 
@@ -297,9 +478,9 @@ struct EditRecipeView: View {
             if let img = selectedImage, let data = img.jpegData(compressionQuality: 0.85) {
                 let path = "\(recipeId)/image.jpg"
                 _ = try await client.storage
-                    .from("recipes")
+                    .from("recipe-images")
                     .upload(path, data: data, options: FileOptions(cacheControl: "3600", contentType: "image/jpeg", upsert: true))
-                newImageURL = try client.storage.from("recipes").getPublicURL(path: path).absoluteString
+                newImageURL = try client.storage.from("recipe-images").getPublicURL(path: path).absoluteString
                 imageRemoved = false
             } else if imageRemoved {
                 newImageURL = nil
@@ -307,11 +488,11 @@ struct EditRecipeView: View {
 
             let updatePayload = RecipeUpdatePayload(
                 title: title,
-                detail: detail,
-                is_public: isPublic,
-                cook_time: cookTimeInt,
-                ingredients: ingredientsArray,
-                image_url: newImageURL
+                description: detail,
+                visibility: isPublic,
+                prepare_time: cookTimeInt,
+                steps_list: stepsArray,
+                photo: newImageURL
             )
 
             _ = try await client
@@ -321,30 +502,109 @@ struct EditRecipeView: View {
                 .eq("user_id", value: auth.currentUser?.id ?? "")
                 .execute()
 
-            _ = try await client
-                .from("recipe_steps")
-                .delete()
-                .eq("recipe_id", value: recipeId)
-                .execute()
-            
-            if !stepTexts.isEmpty {
-                let stepsPayload: [RecipeStepInsert] = stepTexts.enumerated().map { (index, text) in
-                    RecipeStepInsert(
-                        id: UUID(),
-                        recipe_id: recipeId,
-                        order: index + 1,
-                        instruction: text
-                    )
-                }
+            // Update categories for this recipe
+            do {
                 _ = try await client
-                    .from("recipe_steps")
-                    .insert(stepsPayload)
+                    .from("recipe_category")
+                    .delete()
+                    .eq("recipe_id", value: recipeId)
                     .execute()
+
+                if !selectedCategoryIds.isEmpty {
+                    let payload = selectedCategoryIds.map { EditRecipeCategoryInsert(recipe_id: recipeId, category_id: $0) }
+                    _ = try await client
+                        .from("recipe_category")
+                        .insert(payload)
+                        .execute()
+                }
+            } catch {
+                print("[EditRecipeView] update categories warning:", error)
+            }
+
+            // Update ingredients for this recipe
+            do {
+                _ = try await client
+                    .from("product_in_recipe")
+                    .delete()
+                    .eq("recipe_id", value: recipeId)
+                    .execute()
+
+                if !ingredients.isEmpty {
+                    let payload = ingredients.map { ing in
+                        EditProductInRecipeInsert(
+                            recipe_id: recipeId,
+                            product_id: ing.product_id,
+                            quantity: ing.quantity
+                        )
+                    }
+                    _ = try await client
+                        .from("product_in_recipe")
+                        .insert(payload)
+                        .execute()
+                }
+            } catch {
+                print("[EditRecipeView] update ingredients warning:", error)
             }
 
             await MainActor.run { dismiss() }
         } catch {
             await MainActor.run { errorMessage = error.localizedDescription }
+        }
+    }
+
+    private func loadAllCategories() async {
+        do {
+            let result: [EditCategory] = try await SupabaseManager.shared.client
+                .from("category")
+                .select()
+                .execute()
+                .value
+            await MainActor.run { self.allCategories = result }
+        } catch {
+            print("[EditRecipeView] loadAllCategories error:", error)
+        }
+    }
+
+    private func loadRecipeCategories() async {
+        do {
+            let result: [EditRecipeCategoryRow] = try await SupabaseManager.shared.client
+                .from("recipe_category")
+                .select("category_id")
+                .eq("recipe_id", value: recipeId)
+                .execute()
+                .value
+            let ids = Set(result.map { $0.category_id })
+            await MainActor.run { self.selectedCategoryIds = ids }
+        } catch {
+            print("[EditRecipeView] loadRecipeCategories error:", error)
+        }
+    }
+
+    private func loadAllProducts() async {
+        do {
+            let result: [EditProductLookup] = try await SupabaseManager.shared.client
+                .from("product")
+                .select()
+                .execute()
+                .value
+            await MainActor.run { self.allProducts = result }
+        } catch {
+            print("[EditRecipeView] loadAllProducts error:", error)
+        }
+    }
+
+    private func loadExistingIngredients() async {
+        do {
+            let result: [EditIngredientRow] = try await SupabaseManager.shared.client
+                .from("product_in_recipe")
+                .select("product_id, quantity")
+                .eq("recipe_id", value: recipeId)
+                .execute()
+                .value
+            let mapped = result.map { NewRecipeProduct(product_id: $0.product_id, quantity: $0.quantity, unit: nil) }
+            await MainActor.run { self.ingredients = mapped }
+        } catch {
+            print("[EditRecipeView] loadExistingIngredients error:", error)
         }
     }
 }
@@ -357,7 +617,6 @@ struct EditRecipeView_Previews: PreviewProvider {
                 recipeId: sampleId,
                 title: "Przykład",
                 detail: "Opis przepisu",
-                ingredients: ["Składnik1", "Składnik2"],
                 cookTime: 15,
                 isPublic: true,
                 steps: ["Krok 1", "Krok 2"],
