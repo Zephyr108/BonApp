@@ -101,6 +101,7 @@ struct RecipeDetailView: View {
     @State private var loadedIngredients: [IngredientRow] = []
     @State private var loadedCategories: [String] = []
     @State private var isFavorite: Bool = false
+    @State private var favoriteMessage: String? = nil
 
     var body: some View {
         ZStack {
@@ -208,7 +209,7 @@ struct RecipeDetailView: View {
                                 .font(.headline)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 14)
-                                .background(Color.accentColor)
+                                .background(Color("edit"))
                                 .foregroundColor(.white)
                                 .cornerRadius(14)
                                 .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
@@ -218,6 +219,19 @@ struct RecipeDetailView: View {
                     }
                 }
                 .padding()
+            }
+        }
+        .overlay(alignment: .top) {
+            if let message = favoriteMessage {
+                Text(message)
+                    .font(.subheadline.bold())
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(.ultraThinMaterial)
+                    .cornerRadius(20)
+                    .shadow(radius: 4)
+                    .padding(.top, 16)
+                    .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
         .navigationTitle("Szczegóły przepisu")
@@ -337,14 +351,28 @@ struct RecipeDetailView: View {
                         .eq("user_id", value: userId)
                         .eq("recipe_id", value: recipe.id)
                         .execute()
-                    await MainActor.run { isFavorite = false }
+                    await MainActor.run {
+                        isFavorite = false
+                        favoriteMessage = "Usunięto przepis z ulubionych!"
+                    }
+                    Task {
+                        try? await Task.sleep(nanoseconds: 2_000_000_000)
+                        await MainActor.run { favoriteMessage = nil }
+                    }
                 } else {
                     let payload = NewFavorite(user_id: userId, recipe_id: recipe.id)
                     try await SupabaseManager.shared.client
                         .from("favorite_recipe")
                         .insert(payload)
                         .execute()
-                    await MainActor.run { isFavorite = true }
+                    await MainActor.run {
+                        isFavorite = true
+                        favoriteMessage = "Dodano przepis do ulubionych!"
+                    }
+                    Task {
+                        try? await Task.sleep(nanoseconds: 2_000_000_000)
+                        await MainActor.run { favoriteMessage = nil }
+                    }
                 }
             } catch {
                 print("toggleFavorite error:", error)
