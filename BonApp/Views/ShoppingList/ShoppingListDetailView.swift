@@ -4,10 +4,6 @@ struct ShoppingListDetailView: View {
     @StateObject private var viewModel: ShoppingListViewModel
 
     @State private var isPresentingSheet = false
-    @State private var isEditing = false
-    @State private var inputProductId: String = ""
-    @State private var inputQuantity: String = "1"
-    @State private var editingProductId: Int? = nil
 
     private let ownerId: String
     private let shoppingListId: UUID
@@ -62,7 +58,6 @@ struct ShoppingListDetailView: View {
                                 Spacer()
                             }
                             .contentShape(Rectangle())
-                            .onTapGesture { presentEdit(for: item) }
                             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                 Button(role: .destructive) { Task { await viewModel.deleteItem(productId: item.productId) } } label: {
                                     Label("Usuń", systemImage: "trash")
@@ -86,85 +81,44 @@ struct ShoppingListDetailView: View {
                     .help("Przenieś kupione pozycje do spiżarni")
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button { presentAdd() } label: { Image(systemName: "plus") }
+                    Button { isPresentingSheet = true } label: { Image(systemName: "plus") }
                 }
             }
             .task { await viewModel.fetchItems() }
-            .alert("Błąd", isPresented: Binding(get: { viewModel.error != nil }, set: { _ in viewModel.error = nil })) {
-                Button("OK", role: .cancel) { viewModel.error = nil }
-            } message: {
-                Text(viewModel.error ?? "")
+            .alert(
+                isPresented: Binding(
+                    get: { viewModel.error != nil },
+                    set: { _ in viewModel.error = nil }
+                )
+            ) {
+                Alert(
+                    title: Text("Błąd"),
+                    message: Text(viewModel.error ?? ""),
+                    dismissButton: .default(Text("OK")) {
+                        viewModel.error = nil
+                    }
+                )
             }
-            .sheet(isPresented: $isPresentingSheet) { sheetView }
-        }
-    }
-
-    // MARK: - Sheet for Add / Edit
-    @ViewBuilder
-    private var sheetView: some View {
-        NavigationStack {
-            Form {
-                Section("Produkt") {
-                    TextField("product_id (Int)", text: $inputProductId)
-                        .keyboardType(.numberPad)
-                }
-                Section("Ilość") {
-                    TextField("np. 1.0", text: $inputQuantity)
-                        .keyboardType(.decimalPad)
-                }
-            }
-            .navigationTitle(isEditing ? "Edytuj pozycję" : "Dodaj pozycję")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Anuluj") { isPresentingSheet = false }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(isEditing ? "Zapisz" : "Dodaj") { Task { await submitSheet() } }
-                        .disabled(!canSubmit)
-                }
+            .sheet(isPresented: $isPresentingSheet) {
+                AddShoppingListItemView(
+                    shoppingListId: shoppingListId,
+                    onAdded: {
+                        Task { await viewModel.fetchItems() }
+                        isPresentingSheet = false
+                    }
+                )
             }
         }
-    }
-
-    private var canSubmit: Bool {
-        Int(inputProductId) != nil && Double(inputQuantity) != nil && (Double(inputQuantity) ?? 0) > 0
-    }
-
-    private func presentAdd() {
-        isEditing = false
-        inputProductId = ""
-        inputQuantity = "1"
-        editingProductId = nil
-        isPresentingSheet = true
-    }
-
-    private func presentEdit(for item: ShoppingListItemDTO) {
-        isEditing = true
-        inputProductId = String(item.productId)
-        inputQuantity = String(item.count)
-        editingProductId = item.productId
-        isPresentingSheet = true
-    }
-
-    private func submitSheet() async {
-        guard let pid = Int(inputProductId), let qty = Double(inputQuantity), qty > 0 else { return }
-        if isEditing, let original = editingProductId {
-            if original != pid {
-                await viewModel.deleteItem(productId: original)
-                await viewModel.addItem(productId: pid, quantity: qty)
-            } else {
-                await viewModel.updateItem(productId: pid, quantity: qty)
-            }
-        } else {
-            await viewModel.addItem(productId: pid, quantity: qty)
-        }
-        await MainActor.run { isPresentingSheet = false }
     }
 
     // MARK: - Deletion helper
     private func deleteItems(offsets: IndexSet) {
         let ids = offsets.map { viewModel.items[$0].productId }
-        Task { for pid in ids { await viewModel.deleteItem(productId: pid) } }
+        Task {
+            for pid in ids {
+                await viewModel.deleteItem(productId: pid)
+            }
+        }
     }
 }
 
