@@ -39,7 +39,6 @@ struct AddPantryItemView: View {
                         )
                         .cornerRadius(8)
 
-                    // Sugestie produktów po wpisaniu nazwy
                     if !productSearchText.trimmingCharacters(in: .whitespaces).isEmpty {
                         let suggestions = products
                             .filter { $0.name.localizedCaseInsensitiveContains(productSearchText) }
@@ -98,7 +97,6 @@ struct AddPantryItemView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Dodaj") {
                         savePantryItem()
-                        dismiss()
                     }
                     .disabled(
                         selectedProductId == nil ||
@@ -124,18 +122,63 @@ struct AddPantryItemView: View {
     }
     
     private func savePantryItem() {
-        guard let pid = selectedProductId, let uid = auth.currentUser?.id else { return }
-        let qty = Double(quantity.replacingOccurrences(of: ",", with: ".")) ?? 1.0
-        struct InsertPayload: Encodable { let user_id: String; let product_id: Int; let quantity: Double }
-        let payload = InsertPayload(user_id: uid, product_id: pid, quantity: qty)
+        guard
+            let pid = selectedProductId,
+            let uid = auth.currentUser?.id,
+            !quantity.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else { return }
+
+        let qty = Double(quantity.replacingOccurrences(of: ",", with: ".")) ?? 0
+        guard qty > 0 else { return }
+
+        struct ExistingRow: Decodable {
+            let id: UUID
+            let quantity: Double
+        }
+
+        struct InsertPayload: Encodable {
+            let user_id: String
+            let product_id: Int
+            let quantity: Double
+        }
+
+        struct UpdatePayload: Encodable {
+            let quantity: Double
+        }
 
         let client = SupabaseManager.shared.client
+
         Task {
             do {
-                _ = try await client
+                let existing: [ExistingRow] = try await client
                     .from("pantry")
-                    .insert(payload)
+                    .select("id,quantity")
+                    .eq("user_id", value: uid)
+                    .eq("product_id", value: pid)
+                    .limit(1)
                     .execute()
+                    .value
+
+                if let row = existing.first {
+                    let newQuantity = row.quantity + qty
+
+                    _ = try await client
+                        .from("pantry")
+                        .update(UpdatePayload(quantity: newQuantity))
+                        .eq("id", value: row.id)
+                        .execute()
+                } else {
+                    let payload = InsertPayload(user_id: uid, product_id: pid, quantity: qty)
+
+                    _ = try await client
+                        .from("pantry")
+                        .insert(payload)
+                        .execute()
+                }
+
+                await MainActor.run {
+                    dismiss()
+                }
             } catch {
                 print("Failed to save pantry item: \(error.localizedDescription)")
             }
