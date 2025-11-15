@@ -29,7 +29,21 @@ struct ShoppingListDetailView: View {
                 } else {
                     List {
                         ForEach(viewModel.items) { item in
-                            HStack(alignment: .firstTextBaseline) {
+                            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                                Button {
+                                    Task {
+                                        if item.isBought {
+                                            await viewModel.markAsBought(productId: item.productId)
+                                        } else {
+                                            await viewModel.markAsBought(productId: item.productId)
+                                        }
+                                    }
+                                } label: {
+                                    Image(systemName: item.isBought ? "checkmark.circle.fill" : "circle")
+                                        .font(.title3)
+                                }
+                                .buttonStyle(.plain)
+
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(item.productName)
                                         .font(.headline)
@@ -37,29 +51,21 @@ struct ShoppingListDetailView: View {
                                         Text("Ilość:")
                                             .foregroundColor(.secondary)
                                         Text(String(format: "%.2f", item.count))
-                                        if let cat = item.productCategoryId { Text("• kategoria #\(cat)").foregroundColor(.secondary) }
+                                        if let cat = item.productCategoryId {
+                                            Text("• kategoria #\(cat)")
+                                                .foregroundColor(.secondary)
+                                        }
                                     }
                                     .font(.subheadline)
                                 }
+
                                 Spacer()
-                                if item.isBought {
-                                    Image(systemName: "checkmark.circle.fill")
-                                } else {
-                                    Image(systemName: "circle")
-                                }
                             }
                             .contentShape(Rectangle())
                             .onTapGesture { presentEdit(for: item) }
                             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                 Button(role: .destructive) { Task { await viewModel.deleteItem(productId: item.productId) } } label: {
                                     Label("Usuń", systemImage: "trash")
-                                }
-                            }
-                            .swipeActions(edge: .leading) {
-                                if !item.isBought {
-                                    Button { Task { await viewModel.markAsBought(productId: item.productId) } } label: {
-                                        Label("Kupione", systemImage: "checkmark.circle")
-                                    }.tint(.green)
                                 }
                             }
                         }
