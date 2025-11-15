@@ -7,6 +7,7 @@ struct PantryItemRow: Identifiable, Decodable, Hashable {
     let productId: Int
     let productName: String
     let quantity: Double
+    let productUnit: String?
     let productCategoryId: Int?
 
     private enum CodingKeys: String, CodingKey {
@@ -16,7 +17,12 @@ struct PantryItemRow: Identifiable, Decodable, Hashable {
         case product
     }
 
-    private struct ProductEmbed: Decodable { let id: Int; let name: String; let product_category_id: Int? }
+    private struct ProductEmbed: Decodable {
+        let id: Int
+        let name: String
+        let product_category_id: Int?
+        let unit: String?
+    }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -26,6 +32,7 @@ struct PantryItemRow: Identifiable, Decodable, Hashable {
         let p = try c.decode(ProductEmbed.self, forKey: .product)
         productName = p.name
         productCategoryId = p.product_category_id
+        productUnit = p.unit
     }
 }
 
@@ -49,7 +56,7 @@ final class PantryScreenViewModel: ObservableObject {
             guard let uidStr = userId, let uid = UUID(uuidString: uidStr) else { self.pantryItems = []; return }
             let rows: [PantryItemRow] = try await client
                 .from("pantry")
-                .select("id,product_id,quantity,product:product_id(id,name,product_category_id)")
+                .select("id,product_id,quantity,product:product_id(id,name,product_category_id,unit)")
                 .eq("user_id", value: uid) // compare as UUID to avoid type mismatch stalls
                 .order("id", ascending: true)
                 .limit(500)
@@ -124,15 +131,26 @@ struct PantryView: View {
                             .listRowSeparator(.hidden)
                     } else {
                         ForEach(viewModel.pantryItems) { item in
-                            HStack {
-                                VStack(alignment: .leading) {
+                            HStack(alignment: .center, spacing: 12) {
+                                VStack(alignment: .leading, spacing: 4) {
                                     Text(item.productName)
                                         .font(.headline)
                                         .foregroundColor(Color("textPrimary"))
-                                    Text(String(format: "%.2f", item.quantity))
+
+                                    let qty = item.quantity
+                                    let quantityString: String = {
+                                        if qty.truncatingRemainder(dividingBy: 1) == 0 {
+                                            return String(Int(qty))
+                                        } else {
+                                            return String(format: "%.2f", qty)
+                                        }
+                                    }()
+
+                                    Text("\(quantityString) \(item.productUnit ?? "")")
                                         .font(.subheadline)
                                         .foregroundColor(Color("textSecondary"))
                                 }
+
                                 Spacer()
                             }
                             .padding()
@@ -185,16 +203,19 @@ struct PantryView: View {
                         Image(systemName: "plus")
                     }
                 }
-                ToolbarItemGroup(placement: .bottomBar) {
-                    if isSelecting {
-                        Button(action: {
+            }
+            .safeAreaInset(edge: .bottom) {
+                if isSelecting {
+                    HStack {
+                        Button {
                             Task {
                                 await viewModel.deleteItems(with: selectedIds)
                                 await MainActor.run {
-                                    selectedIds.removeAll(); isSelecting = false
+                                    selectedIds.removeAll()
+                                    isSelecting = false
                                 }
                             }
-                        }) {
+                        } label: {
                             Text("Usuń zaznaczone")
                                 .foregroundColor(Color("buttonText"))
                                 .padding(.horizontal)
@@ -205,10 +226,10 @@ struct PantryView: View {
 
                         Spacer()
 
-                        Button(action: {
+                        Button {
                             selectedIds.removeAll()
                             isSelecting = false
-                        }) {
+                        } label: {
                             Text("Anuluj")
                                 .foregroundColor(Color("buttonText"))
                                 .padding(.horizontal)
@@ -217,6 +238,9 @@ struct PantryView: View {
                                 .cornerRadius(8)
                         }
                     }
+                    .padding(.horizontal)
+                    .padding(.vertical, 10)
+                    .background(.ultraThinMaterial)
                 }
             }
         }
