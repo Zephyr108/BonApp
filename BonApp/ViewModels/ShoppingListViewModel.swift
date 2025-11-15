@@ -96,36 +96,62 @@ final class ShoppingListViewModel: ObservableObject {
         defer { isLoading = false }
 
         do {
-            // Nie musimy tu filtrować po userId, lista jest już jednoznacznie określona przez shoppingListId
-            let rawRows: [ShoppingListItemDTO] = try await client
+            struct RawRow: Decodable {
+                let product_id: Int
+                let quantity: Double
+                let is_bought: Bool
+                let shopping_list_id: UUID
+            }
+
+            let rawRows: [RawRow] = try await client
                 .from("product_on_list")
-                .select("product_id,count,is_bought,shopping_list_id,product:product_id(id,name,product_category_id)")
+                .select("product_id,quantity,is_bought,shopping_list_id") // <- TEŻ quantity
                 .eq("shopping_list_id", value: shoppingListId)
                 .order("is_bought", ascending: true)
                 .order("product_id", ascending: true)
                 .execute()
                 .value
 
-            // Scal powtarzające się produkty (ten sam product_id) sumując ilości
-            let grouped = Dictionary(grouping: rawRows, by: { $0.productId })
+            guard !rawRows.isEmpty else {
+                self.items = []
+                return
+            }
 
-            let merged: [ShoppingListItemDTO] = grouped.values.compactMap { group -> ShoppingListItemDTO? in
+            struct ProductRow: Decodable {
+                let id: Int
+                let name: String
+                let product_category_id: Int?
+            }
+
+            let productIds = Array(Set(rawRows.map { $0.product_id }))
+            let products: [ProductRow] = try await client
+                .from("product")
+                .select("id,name,product_category_id")
+                .in("id", values: productIds)
+                .execute()
+                .value
+
+            let productMap = Dictionary(uniqueKeysWithValues: products.map { ($0.id, $0) })
+
+            let grouped = Dictionary(grouping: rawRows, by: { $0.product_id })
+
+            let merged: [ShoppingListItemDTO] = grouped.compactMap { (productId, group) in
                 guard let first = group.first else { return nil }
-                let totalCount = group.reduce(0.0) { $0 + $1.count }
-                // jeżeli choć jeden wpis NIE jest kupiony, traktujemy całość jako niekupioną
-                let allBought = group.allSatisfy { $0.isBought }
+                let totalQuantity = group.reduce(0.0) { $0 + $1.quantity }
+                let allBought = group.allSatisfy { $0.is_bought }
+
+                let product = productMap[productId]
 
                 return ShoppingListItemDTO(
-                    productId: first.productId,
-                    count: totalCount,
+                    productId: productId,
+                    count: totalQuantity,
                     isBought: allBought,
-                    shoppingListId: first.shoppingListId,
-                    productName: first.productName,
-                    productCategoryId: first.productCategoryId
+                    shoppingListId: first.shopping_list_id,
+                    productName: product?.name ?? "Produkt \(productId)",
+                    productCategoryId: product?.product_category_id
                 )
             }
 
-            // Najpierw niekupione, potem kupione; w ramach grupy sortujemy alfabetycznie
             self.items = merged.sorted {
                 if $0.isBought == $1.isBought {
                     return $0.productName < $1.productName
@@ -133,6 +159,7 @@ final class ShoppingListViewModel: ObservableObject {
                     return !$0.isBought && $1.isBought
                 }
             }
+
         } catch {
             self.error = error.localizedDescription
             self.items = []
