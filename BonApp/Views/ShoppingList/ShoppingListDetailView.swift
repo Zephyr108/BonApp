@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ShoppingListDetailView: View {
+    @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: ShoppingListViewModel
 
     @State private var isPresentingSheet = false
@@ -117,6 +118,72 @@ struct ShoppingListDetailView: View {
                             isPresentingSheet = false
                         }
                     )
+                }
+                // Dolny popup jako pełnoekranowy sheet z potwierdzeniem usunięcia listy
+                .sheet(isPresented: $viewModel.shouldAskToDeleteList) {
+                    ZStack {
+                        Color("background")
+                            .ignoresSafeArea()
+
+                        VStack(spacing: 24) {
+                            // Pasek do przeciągania
+                            Capsule()
+                                .frame(width: 40, height: 5)
+                                .foregroundStyle(.secondary)
+                                .padding(.top, 8)
+
+                            VStack(spacing: 8) {
+                                Text("Wszystkie produkty z listy zostały kupione i już są w spiżarni.")
+                                    .font(.headline)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal)
+
+                                Text("Czy usunąć listę zakupową?")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal)
+                            }
+
+                            Spacer()
+
+                            VStack(spacing: 12) {
+                                Button(role: .destructive) {
+                                    Task {
+                                        await viewModel.deleteCurrentList()
+                                        await MainActor.run {
+                                            viewModel.shouldAskToDeleteList = false
+                                            dismiss()
+                                        }
+                                    }
+                                } label: {
+                                    Text("Usuń listę")
+                                        .font(.headline)
+                                        .frame(maxWidth: .infinity)
+                                        .padding()
+                                        .background(Color.red)
+                                        .foregroundColor(.white)
+                                        .cornerRadius(12)
+                                }
+
+                                Button {
+                                    viewModel.shouldAskToDeleteList = false
+                                } label: {
+                                    Text("Anuluj")
+                                        .font(.headline)
+                                        .frame(maxWidth: .infinity)
+                                        .padding()
+                                        .background(Color(.systemGray5))
+                                        .foregroundColor(.primary)
+                                        .cornerRadius(12)
+                                }
+                            }
+                            .padding(.horizontal)
+                            .padding(.bottom, 24)
+                        }
+                    }
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
                 }
             }
         }

@@ -79,6 +79,7 @@ final class ShoppingListViewModel: ObservableObject {
     @Published var items: [ShoppingListItemDTO] = []
     @Published var isLoading: Bool = false
     @Published var error: String? = nil
+    @Published var shouldAskToDeleteList: Bool = false
 
     private let client = SupabaseManager.shared.client
     private let userId: String?
@@ -270,7 +271,8 @@ final class ShoppingListViewModel: ObservableObject {
                 .execute()
                 .value
 
-            guard !rows.isEmpty else { return }
+            let hadRows = !rows.isEmpty
+            guard hadRows else { return }
 
             // Ustal aktualne UID
             var effectiveUid = userId
@@ -325,6 +327,50 @@ final class ShoppingListViewModel: ObservableObject {
             }
 
             await fetchItems()
+            if hadRows {
+                await MainActor.run {
+                    if self.items.isEmpty {
+                        self.shouldAskToDeleteList = true
+                    }
+                }
+            }
+        } catch {
+            await MainActor.run { self.error = error.localizedDescription }
+        }
+    }
+
+    // MARK: - Delete whole list (when all items bought and moved to pantry)
+    func deleteCurrentList() async {
+        // Ustal poprawne UID (najpierw z ownerId, a jeśli puste – z aktualnej sesji)
+        var effectiveUid: String? = userId
+        if effectiveUid == nil || effectiveUid?.isEmpty == true {
+            if let session = try? await client.auth.session {
+                effectiveUid = session.user.id.uuidString
+            }
+        }
+
+        guard let uid = effectiveUid, !uid.isEmpty else {
+            await MainActor.run {
+                self.error = "Brak zalogowanego użytkownika – nie można usunąć listy."
+            }
+            return
+        }
+
+        do {
+            // Najpierw usuń powiązane pozycje z product_on_list
+            _ = try await client
+                .from("product_on_list")
+                .delete()
+                .eq("shopping_list_id", value: shoppingListId)
+                .execute()
+
+            // Następnie usuń samą listę (zabezpieczenie przez user_id)
+            _ = try await client
+                .from("shopping_list")
+                .delete()
+                .eq("id", value: shoppingListId)
+                .eq("user_id", value: uid)
+                .execute()
         } catch {
             await MainActor.run { self.error = error.localizedDescription }
         }
