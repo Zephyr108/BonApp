@@ -131,35 +131,31 @@ struct PantryView: View {
                             .listRowSeparator(.hidden)
                     } else {
                         ForEach(viewModel.pantryItems) { item in
-                            HStack(alignment: .center, spacing: 12) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(item.productName)
-                                        .font(.headline)
-                                        .foregroundColor(Color("textPrimary"))
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(item.productName)
+                                    .font(.headline)
+                                    .foregroundColor(Color("textPrimary"))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                                    let qty = item.quantity
-                                    let quantityString: String = {
-                                        if qty.truncatingRemainder(dividingBy: 1) == 0 {
-                                            return String(Int(qty))
-                                        } else {
-                                            return String(format: "%.2f", qty)
-                                        }
-                                    }()
+                                let qty = item.quantity
+                                let quantityString: String = {
+                                    if qty.truncatingRemainder(dividingBy: 1) == 0 {
+                                        return String(Int(qty))
+                                    } else {
+                                        return String(format: "%.2f", qty)
+                                    }
+                                }()
 
-                                    Text("\(quantityString) \(item.productUnit ?? "")")
-                                        .font(.subheadline)
-                                        .foregroundColor(Color("textSecondary"))
-                                }
-
-                                Spacer()
+                                Text("\(quantityString) \(item.productUnit ?? "")")
+                                    .font(.subheadline)
+                                    .foregroundColor(Color("textSecondary"))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            .padding()
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 14)
                             .background(rowBackground(for: item.id))
-                            .cornerRadius(8)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(Color("textfieldBorder"), lineWidth: 1)
-                            )
+                            .cornerRadius(20)
+                            .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 4)
                             .contentShape(Rectangle())
                             .onTapGesture {
                                 if isSelecting {
@@ -177,6 +173,7 @@ struct PantryView: View {
                                     Label("Usuń", systemImage: "trash")
                                 }
                             }
+                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                         }
