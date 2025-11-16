@@ -28,11 +28,7 @@ struct ShoppingListDetailView: View {
                             HStack(alignment: .firstTextBaseline, spacing: 12) {
                                 Button {
                                     Task {
-                                        if item.isBought {
-                                            await viewModel.markAsBought(productId: item.productId)
-                                        } else {
-                                            await viewModel.markAsBought(productId: item.productId)
-                                        }
+                                        await viewModel.markAsBought(productId: item.productId)
                                     }
                                 } label: {
                                     Image(systemName: item.isBought ? "checkmark.circle.fill" : "circle")
@@ -46,7 +42,7 @@ struct ShoppingListDetailView: View {
                                     HStack(spacing: 8) {
                                         Text("Ilość:")
                                             .foregroundColor(.secondary)
-                                        Text(String(format: "%.2f", item.count))
+                                        Text(String(format: "%.2f", item.quantity))
                                         if let cat = item.productCategoryId {
                                             Text("• kategoria #\(cat)")
                                                 .foregroundColor(.secondary)
@@ -59,7 +55,11 @@ struct ShoppingListDetailView: View {
                             }
                             .contentShape(Rectangle())
                             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button(role: .destructive) { Task { await viewModel.deleteItem(productId: item.productId) } } label: {
+                                Button(role: .destructive) {
+                                    Task {
+                                        await viewModel.deleteItem(productId: item.productId)
+                                    }
+                                } label: {
                                     Label("Usuń", systemImage: "trash")
                                 }
                             }
