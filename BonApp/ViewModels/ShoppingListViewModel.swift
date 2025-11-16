@@ -9,6 +9,7 @@ struct ShoppingListItemDTO: Identifiable, Hashable, Decodable {
     let shoppingListId: UUID
     let productName: String
     let productCategoryId: Int?
+    let unit: String?
     var id: String { "\(shoppingListId.uuidString)-\(productId)" }
 
     init(
@@ -17,7 +18,8 @@ struct ShoppingListItemDTO: Identifiable, Hashable, Decodable {
         isBought: Bool,
         shoppingListId: UUID,
         productName: String,
-        productCategoryId: Int?
+        productCategoryId: Int?,
+        unit: String?
     ) {
         self.productId = productId
         self.quantity = quantity
@@ -25,6 +27,7 @@ struct ShoppingListItemDTO: Identifiable, Hashable, Decodable {
         self.shoppingListId = shoppingListId
         self.productName = productName
         self.productCategoryId = productCategoryId
+        self.unit = unit
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -35,7 +38,7 @@ struct ShoppingListItemDTO: Identifiable, Hashable, Decodable {
         case product
     }
 
-    private struct ProductEmbed: Decodable { let id: Int; let name: String; let product_category_id: Int? }
+    private struct ProductEmbed: Decodable { let id: Int; let name: String; let product_category_id: Int?; let unit: String? }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -46,6 +49,7 @@ struct ShoppingListItemDTO: Identifiable, Hashable, Decodable {
         let p = try c.decode(ProductEmbed.self, forKey: .product)
         productName = p.name
         productCategoryId = p.product_category_id
+        unit = p.unit
     }
 }
 
@@ -121,12 +125,13 @@ final class ShoppingListViewModel: ObservableObject {
                 let id: Int
                 let name: String
                 let product_category_id: Int?
+                let unit: String?
             }
 
             let productIds = Array(Set(rawRows.map { $0.product_id }))
             let products: [ProductRow] = try await client
                 .from("product")
-                .select("id,name,product_category_id")
+                .select("id,name,product_category_id,unit")
                 .in("id", values: productIds)
                 .execute()
                 .value
@@ -148,7 +153,8 @@ final class ShoppingListViewModel: ObservableObject {
                     isBought: allBought,
                     shoppingListId: first.shopping_list_id,
                     productName: product?.name ?? "Produkt \(productId)",
-                    productCategoryId: product?.product_category_id
+                    productCategoryId: product?.product_category_id,
+                    unit: product?.unit
                 )
             }
 

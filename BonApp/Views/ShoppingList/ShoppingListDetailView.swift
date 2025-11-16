@@ -25,26 +25,30 @@ struct ShoppingListDetailView: View {
                 } else {
                     List {
                         ForEach(viewModel.items) { item in
-                            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                            HStack(alignment: .center, spacing: 12) {
                                 Button {
                                     Task {
                                         await viewModel.markAsBought(productId: item.productId)
                                     }
                                 } label: {
                                     Image(systemName: item.isBought ? "checkmark.circle.fill" : "circle")
-                                        .font(.title3)
+                                        .font(.title2)
                                 }
                                 .buttonStyle(.plain)
 
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(item.productName)
                                         .font(.headline)
-                                    HStack(spacing: 8) {
+
+                                    HStack(spacing: 4) {
                                         Text("Ilość:")
                                             .foregroundColor(.secondary)
+
                                         Text(String(format: "%.2f", item.quantity))
-                                        if let cat = item.productCategoryId {
-                                            Text("• kategoria #\(cat)")
+                                            .foregroundColor(.primary)
+
+                                        if let unit = item.unit, !unit.isEmpty {
+                                            Text(unit)
                                                 .foregroundColor(.secondary)
                                         }
                                     }
