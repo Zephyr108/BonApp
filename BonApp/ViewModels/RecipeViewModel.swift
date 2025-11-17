@@ -363,7 +363,6 @@ final class RecipeViewModel: ObservableObject {
     func addStep(_ instruction: String, to recipeId: UUID) async {
         do {
             struct StepsRow: Decodable { let steps_list: [String]? }
-            // 1) Load current steps
             let rows: [StepsRow] = try await client
                 .from("recipe")
                 .select("steps_list")
@@ -432,8 +431,6 @@ final class RecipeViewModel: ObservableObject {
         let user_id: String
     }
 
-    /// Zwraca listę składników przepisu wraz z informacją,
-    /// czy są dostępne w spiżarni użytkownika.
     func ingredientsAvailability(for recipeId: UUID) async throws -> [IngredientAvailability] {
         guard let uid = await resolveCurrentUserId() else {
             let err = "Brak zalogowanego użytkownika"
@@ -442,7 +439,6 @@ final class RecipeViewModel: ObservableObject {
         }
 
         do {
-            // 1) Składniki przepisu + informacje o produkcie
             let recipeRows: [ProductInRecipeRow] = try await client
                 .from("product_in_recipe")
                 .select("product_id,quantity,product(name,unit)")
@@ -450,7 +446,6 @@ final class RecipeViewModel: ObservableObject {
                 .execute()
                 .value
 
-            // 2) Zawartość spiżarni użytkownika
             let pantryRows: [PantryRow] = try await client
                 .from("pantry")
                 .select("product_id,quantity,user_id")
@@ -458,13 +453,11 @@ final class RecipeViewModel: ObservableObject {
                 .execute()
                 .value
 
-            // 3) Sumujemy ilości w spiżarni per produkt
             var pantryByProduct: [Int: Double] = [:]
             for row in pantryRows {
                 pantryByProduct[row.product_id, default: 0] += row.quantity
             }
 
-            // 4) Budujemy wynik
             let result: [IngredientAvailability] = recipeRows.map { row in
                 let available = pantryByProduct[row.product_id] ?? 0
                 return IngredientAvailability(
@@ -497,11 +490,8 @@ final class RecipeViewModel: ObservableObject {
         let is_bought: Bool
         let shopping_list_id: UUID
         let product_id: Int
-        let unit: String?
     }
 
-    /// Tworzy nową listę zakupów zawierającą tylko brakujące produkty z przepisu.
-    /// Zwraca identyfikator stworzonej listy.
     func createShoppingListForMissingItems(recipeId: UUID, recipeTitle: String) async throws -> UUID {
         guard let uid = await resolveCurrentUserId() else {
             let err = "Brak zalogowanego użytkownika"
@@ -509,34 +499,29 @@ final class RecipeViewModel: ObservableObject {
             throw NSError(domain: "Recipe", code: 11, userInfo: [NSLocalizedDescriptionKey: err])
         }
 
-        // 1) Obliczamy dostępność składników
         let availability = try await ingredientsAvailability(for: recipeId)
         let missing = availability.filter { $0.missingQuantity > 0.0001 }
 
         guard !missing.isEmpty else {
-            // Nie ma braków – nie tworzymy listy
             return UUID()
         }
 
         let listId = UUID()
 
         do {
-            // 2) Tworzymy listę zakupów
             let listInsert = ShoppingListInsert(id: listId, name: recipeTitle, user_id: uid)
             _ = try await client
                 .from("shopping_list")
                 .insert(listInsert)
                 .execute()
 
-            // 3) Dodajemy brakujące produkty do product_on_list
             let itemsPayload: [ProductOnListInsert] = missing.map { item in
                 ProductOnListInsert(
                     id: UUID(),
                     quantity: item.missingQuantity,
                     is_bought: false,
                     shopping_list_id: listId,
-                    product_id: item.productId,
-                    unit: item.unit
+                    product_id: item.productId
                 )
             }
 
