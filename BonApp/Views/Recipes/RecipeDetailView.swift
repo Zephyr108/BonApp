@@ -97,11 +97,18 @@ private struct FavoriteRow: Decodable, Hashable {
 struct RecipeDetailView: View {
     let recipe: RecipeDetailItem
     @EnvironmentObject var auth: AuthViewModel
+    @StateObject private var recipeVM = RecipeViewModel()
+    @State private var ingredientAvailability: [IngredientAvailability] = []
+    @State private var isCreatingShoppingList: Bool = false
     @State private var loadedSteps: [RecipeStepItem] = []
     @State private var loadedIngredients: [IngredientRow] = []
     @State private var loadedCategories: [String] = []
     @State private var isFavorite: Bool = false
     @State private var favoriteMessage: String? = nil
+
+    private var hasMissingIngredients: Bool {
+        ingredientAvailability.contains { !$0.isAvailable }
+    }
 
     var body: some View {
         ZStack {
@@ -155,7 +162,30 @@ struct RecipeDetailView: View {
                     Text("Składniki")
                         .font(.headline)
                         .foregroundColor(Color("textSecondary"))
-                    if !loadedIngredients.isEmpty {
+                    if !ingredientAvailability.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(ingredientAvailability) { item in
+                                let required = formatQuantity(item.requiredQuantity)
+                                let unit = formatUnit(item.unit)
+                                let available = formatQuantity(item.inPantryQuantity)
+
+                                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                    Image(systemName: item.isAvailable ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                        .foregroundColor(item.isAvailable ? .green : .red)
+
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("\(required) \(unit) \(item.name)")
+                                            .foregroundColor(Color("textPrimary"))
+                                        Text("W spiżarni: \(available) \(unit)")
+                                            .font(.caption)
+                                            .foregroundColor(Color("textSecondary"))
+                                    }
+
+                                    Spacer()
+                                }
+                            }
+                        }
+                    } else if !loadedIngredients.isEmpty {
                         VStack(alignment: .leading, spacing: 4) {
                             ForEach(loadedIngredients) { row in
                                 let qty = formatQuantity(row.quantity)
@@ -195,6 +225,39 @@ struct RecipeDetailView: View {
                         }
                     }
                     
+                    if hasMissingIngredients {
+                        Button {
+                            Task {
+                                isCreatingShoppingList = true
+                                defer { isCreatingShoppingList = false }
+                                do {
+                                    _ = try await recipeVM.createShoppingListForMissingItems(
+                                        recipeId: recipe.id,
+                                        recipeTitle: recipe.title.isEmpty ? "Lista zakupów" : recipe.title
+                                    )
+                                    // Tu opcjonalnie można dodać komunikat o sukcesie
+                                    print("Utworzono listę zakupów dla brakujących produktów.")
+                                } catch {
+                                    print("[RecipeDetailView] createShoppingListForMissingItems error:", error)
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "cart.badge.plus")
+                                Text("Dodaj brakujące produkty do listy zakupów")
+                            }
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color("itemsListBackground"))
+                            .foregroundColor(Color("textPrimary"))
+                            .cornerRadius(14)
+                            .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+                            .padding(.top, 16)
+                        }
+                        .disabled(isCreatingShoppingList)
+                    }
+
                     if let user = auth.currentUser, user.id == recipe.userId {
                         NavigationLink(destination: EditRecipeView(
                             recipeId: recipe.id,
@@ -248,6 +311,7 @@ struct RecipeDetailView: View {
         .task {
             if recipe.steps.isEmpty { await loadStepsFromDB() }
             await loadIngredientsFromDB()
+            await loadIngredientsAvailability()
             await loadCategoriesFromDB()
             await loadFavoriteStatus()
         }
@@ -310,6 +374,17 @@ struct RecipeDetailView: View {
             await MainActor.run { self.loadedCategories = names }
         } catch {
             print("[RecipeDetailView] loadCategoriesFromDB error:", error)
+        }
+    }
+
+    private func loadIngredientsAvailability() async {
+        do {
+            let availability = try await recipeVM.ingredientsAvailability(for: recipe.id)
+            await MainActor.run {
+                self.ingredientAvailability = availability
+            }
+        } catch {
+            print("[RecipeDetailView] loadIngredientsAvailability error:", error)
         }
     }
 

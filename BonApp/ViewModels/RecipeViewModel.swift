@@ -34,6 +34,23 @@ struct NewRecipeProduct: Encodable {
     let unit: String?
 }
 
+struct IngredientAvailability: Identifiable, Hashable {
+    let id = UUID()
+    let productId: Int
+    let name: String
+    let requiredQuantity: Double
+    let unit: String?
+    let inPantryQuantity: Double
+
+    var missingQuantity: Double {
+        max(0, requiredQuantity - inPantryQuantity)
+    }
+
+    var isAvailable: Bool {
+        missingQuantity <= 0.0001
+    }
+}
+
 private struct RecipeInsert: Encodable {
     let id: UUID
     let title: String
@@ -393,6 +410,145 @@ final class RecipeViewModel: ObservableObject {
         let texts = await rawSteps(for: recipeId)
         return texts.enumerated().map { idx, text in
             RecipeStepDTO(id: UUID(), recipeId: recipeId, order: idx + 1, instruction: text)
+        }
+    }
+
+    // MARK: - Ingredients & pantry comparison
+
+    private struct ProductInRecipeRow: Decodable {
+        let product_id: Int
+        let quantity: Double
+        let product: ProductRef
+
+        struct ProductRef: Decodable {
+            let name: String
+            let unit: String?
+        }
+    }
+
+    private struct PantryRow: Decodable {
+        let product_id: Int
+        let quantity: Double
+        let user_id: String
+    }
+
+    /// Zwraca listę składników przepisu wraz z informacją,
+    /// czy są dostępne w spiżarni użytkownika.
+    func ingredientsAvailability(for recipeId: UUID) async throws -> [IngredientAvailability] {
+        guard let uid = await resolveCurrentUserId() else {
+            let err = "Brak zalogowanego użytkownika"
+            await MainActor.run { self.error = err }
+            throw NSError(domain: "Recipe", code: 10, userInfo: [NSLocalizedDescriptionKey: err])
+        }
+
+        do {
+            // 1) Składniki przepisu + informacje o produkcie
+            let recipeRows: [ProductInRecipeRow] = try await client
+                .from("product_in_recipe")
+                .select("product_id,quantity,product(name,unit)")
+                .eq("recipe_id", value: recipeId)
+                .execute()
+                .value
+
+            // 2) Zawartość spiżarni użytkownika
+            let pantryRows: [PantryRow] = try await client
+                .from("pantry")
+                .select("product_id,quantity,user_id")
+                .eq("user_id", value: uid)
+                .execute()
+                .value
+
+            // 3) Sumujemy ilości w spiżarni per produkt
+            var pantryByProduct: [Int: Double] = [:]
+            for row in pantryRows {
+                pantryByProduct[row.product_id, default: 0] += row.quantity
+            }
+
+            // 4) Budujemy wynik
+            let result: [IngredientAvailability] = recipeRows.map { row in
+                let available = pantryByProduct[row.product_id] ?? 0
+                return IngredientAvailability(
+                    productId: row.product_id,
+                    name: row.product.name,
+                    requiredQuantity: row.quantity,
+                    unit: row.product.unit,
+                    inPantryQuantity: available
+                )
+            }
+
+            return result
+        } catch {
+            await MainActor.run { self.error = error.localizedDescription }
+            throw error
+        }
+    }
+
+    // MARK: - Shopping list for missing items
+
+    private struct ShoppingListInsert: Encodable {
+        let id: UUID
+        let name: String
+        let user_id: String
+    }
+
+    private struct ProductOnListInsert: Encodable {
+        let id: UUID
+        let quantity: Double
+        let is_bought: Bool
+        let shopping_list_id: UUID
+        let product_id: Int
+        let unit: String?
+    }
+
+    /// Tworzy nową listę zakupów zawierającą tylko brakujące produkty z przepisu.
+    /// Zwraca identyfikator stworzonej listy.
+    func createShoppingListForMissingItems(recipeId: UUID, recipeTitle: String) async throws -> UUID {
+        guard let uid = await resolveCurrentUserId() else {
+            let err = "Brak zalogowanego użytkownika"
+            await MainActor.run { self.error = err }
+            throw NSError(domain: "Recipe", code: 11, userInfo: [NSLocalizedDescriptionKey: err])
+        }
+
+        // 1) Obliczamy dostępność składników
+        let availability = try await ingredientsAvailability(for: recipeId)
+        let missing = availability.filter { $0.missingQuantity > 0.0001 }
+
+        guard !missing.isEmpty else {
+            // Nie ma braków – nie tworzymy listy
+            return UUID()
+        }
+
+        let listId = UUID()
+
+        do {
+            // 2) Tworzymy listę zakupów
+            let listInsert = ShoppingListInsert(id: listId, name: recipeTitle, user_id: uid)
+            _ = try await client
+                .from("shopping_list")
+                .insert(listInsert)
+                .execute()
+
+            // 3) Dodajemy brakujące produkty do product_on_list
+            let itemsPayload: [ProductOnListInsert] = missing.map { item in
+                ProductOnListInsert(
+                    id: UUID(),
+                    quantity: item.missingQuantity,
+                    is_bought: false,
+                    shopping_list_id: listId,
+                    product_id: item.productId,
+                    unit: item.unit
+                )
+            }
+
+            _ = try await client
+                .from("product_on_list")
+                .insert(itemsPayload)
+                .execute()
+
+            return listId
+        } catch {
+            await MainActor.run { self.error = error.localizedDescription }
+            throw error
         }
     }
 }
