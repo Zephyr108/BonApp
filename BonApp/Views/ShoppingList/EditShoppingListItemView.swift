@@ -5,20 +5,18 @@ struct EditShoppingListItemView: View {
     let shoppingListId: UUID
     let initialProductId: Int
     let initialQuantity: Double
+    let productName: String
 
     @Environment(\.dismiss) private var dismiss
 
-    @State private var selectedProductId: Int
     @State private var quantity: String
-    @State private var products: [ProductRow] = []
     @State private var isSaving = false
-    @State private var isLoading = false
 
-    init(shoppingListId: UUID, productId: Int, quantity: Double = 1.0) {
+    init(shoppingListId: UUID, productId: Int, productName: String, quantity: Double) {
         self.shoppingListId = shoppingListId
         self.initialProductId = productId
         self.initialQuantity = quantity
-        _selectedProductId = State(initialValue: productId)
+        self.productName = productName
         _quantity = State(initialValue: String(quantity))
     }
 
@@ -30,12 +28,8 @@ struct EditShoppingListItemView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Produkt")
                             .foregroundColor(Color("textPrimary"))
-                        Picker("Wybierz produkt", selection: $selectedProductId) {
-                            ForEach(products) { product in
-                                Text(product.name).tag(product.id)
-                            }
-                        }
-                        .pickerStyle(MenuPickerStyle())
+                        Text(productName)
+                            .foregroundColor(Color("textSecondary"))
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
@@ -67,28 +61,10 @@ struct EditShoppingListItemView: View {
             }
             .navigationTitle("Edytuj pozycję listy zakupów")
             .navigationBarTitleDisplayMode(.inline)
-            .task { await loadProducts() }
-        }
-    }
-
-    private func loadProducts() async {
-        isLoading = true
-        defer { isLoading = false }
-        do {
-            let rows: [ProductRow] = try await SupabaseManager.shared.client
-                .from("product")
-                .select("id,name,product_category_id")
-                .order("name", ascending: true)
-                .execute()
-                .value
-            self.products = rows
-        } catch {
-            print("Błąd ładowania produktów: \(error.localizedDescription)")
         }
     }
 
     private func saveChanges() {
-        let pid = selectedProductId
         let qty = Double(quantity.replacingOccurrences(of: ",", with: ".")) ?? 1.0
         isSaving = true
         Task {
@@ -96,28 +72,17 @@ struct EditShoppingListItemView: View {
             do {
                 let client = SupabaseManager.shared.client
 
-                struct ProductOnListInsert: Encodable { let shopping_list_id: UUID; let product_id: Int; let count: Double; let is_bought: Bool }
-                struct ProductOnListUpdate: Encodable { let count: Double?; let is_bought: Bool? }
-
-                if pid != initialProductId {
-                    _ = try await client
-                        .from("product_on_list")
-                        .delete()
-                        .eq("shopping_list_id", value: shoppingListId)
-                        .eq("product_id", value: initialProductId)
-                        .execute()
-
-                    let insertPayload = ProductOnListInsert(shopping_list_id: shoppingListId, product_id: pid, count: qty, is_bought: false)
-                    _ = try await client.from("product_on_list").insert(insertPayload).execute()
-                } else {
-                    let updatePayload = ProductOnListUpdate(count: qty, is_bought: nil)
-                    _ = try await client
-                        .from("product_on_list")
-                        .update(updatePayload)
-                        .eq("shopping_list_id", value: shoppingListId)
-                        .eq("product_id", value: pid)
-                        .execute()
+                struct ProductOnListUpdate: Encodable {
+                    let quantity: Double
                 }
+
+                let updatePayload = ProductOnListUpdate(quantity: qty)
+                _ = try await client
+                    .from("product_on_list")
+                    .update(updatePayload)
+                    .eq("shopping_list_id", value: shoppingListId)
+                    .eq("product_id", value: initialProductId)
+                    .execute()
 
                 dismiss()
             } catch {
@@ -127,14 +92,13 @@ struct EditShoppingListItemView: View {
     }
 }
 
-private struct ProductRow: Decodable, Identifiable {
-    let id: Int
-    let name: String
-    let product_category_id: Int?
-}
-
 #Preview {
     NavigationStack {
-        EditShoppingListItemView(shoppingListId: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!, productId: 1, quantity: 2.0)
+        EditShoppingListItemView(
+            shoppingListId: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!,
+            productId: 1,
+            productName: "Makaron",
+            quantity: 2.0
+        )
     }
 }

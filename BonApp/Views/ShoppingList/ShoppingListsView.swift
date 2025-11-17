@@ -24,40 +24,49 @@ struct ShoppingListsView: View {
                     } else if listsVM.lists.isEmpty {
                         ContentUnavailableView("Brak list zakupowych", systemImage: "cart", description: Text("Dodaj nową listę przyciskiem plus."))
                     } else {
-                        ScrollView {
-                            LazyVStack(spacing: 12) {
-                                ForEach(listsVM.lists, id: \.id) { list in
-                                    NavigationLink {
-                                        ShoppingListDetailView(
-                                            ownerId: ownerId ?? "",
-                                            shoppingListId: list.id,
-                                            listName: list.name
-                                        )
-                                    } label: {
-                                        VStack(alignment: .leading, spacing: 8) {
-                                            Text(list.name)
-                                                .font(.headline)
-                                                .foregroundColor(Color("textPrimary"))
-                                                .lineLimit(2)
-                                                .multilineTextAlignment(.leading)
+                        List {
+                            ForEach(listsVM.lists, id: \.id) { list in
+                                NavigationLink {
+                                    ShoppingListDetailView(
+                                        ownerId: ownerId ?? "",
+                                        shoppingListId: list.id,
+                                        listName: list.name
+                                    )
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        Text(list.name)
+                                            .font(.headline)
+                                            .foregroundColor(Color("textPrimary"))
+                                            .lineLimit(2)
+                                            .multilineTextAlignment(.leading)
 
-                                            Text("Otwórz listę")
-                                                .font(.caption)
-                                                .foregroundColor(Color("textSecondary"))
-                                        }
-                                        .padding(16)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .background(Color("itemsListBackground"))
-                                        .cornerRadius(16)
-                                        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+                                        Text("Otwórz listę")
+                                            .font(.caption)
+                                            .foregroundColor(Color("textSecondary"))
                                     }
-                                    .buttonStyle(.plain)
+                                    .padding(16)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(Color("itemsListBackground"))
+                                    .cornerRadius(16)
+                                    .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
                                 }
+                                .buttonStyle(.plain)
+                                .swipeActions(edge: .trailing) {
+                                    Button(role: .destructive) {
+                                        Task {
+                                            await listsVM.deleteList(id: list.id)
+                                        }
+                                    } label: {
+                                        Label("Usuń", systemImage: "trash")
+                                    }
+                                }
+                                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
                             }
-                            .padding(.horizontal)
-                            .padding(.top, 8)
-                            .padding(.bottom, 16)
                         }
+                        .listStyle(.plain)
+                        .scrollContentBackground(.hidden)
                     }
 
                     if let err = listsVM.error {

@@ -3,6 +3,7 @@ import SwiftUI
 struct ShoppingListDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: ShoppingListViewModel
+    @State private var editingItem: ShoppingListItemDTO? = nil
 
     @State private var isPresentingSheet = false
 
@@ -73,6 +74,9 @@ struct ShoppingListDetailView: View {
                                         Label("Usuń", systemImage: "trash")
                                     }
                                 }
+                                .onLongPressGesture {
+                                    editingItem = item
+                                }
                             }
                             .onDelete(perform: deleteItems)
                         }
@@ -119,14 +123,27 @@ struct ShoppingListDetailView: View {
                         }
                     )
                 }
-                // Dolny popup jako pełnoekranowy sheet z potwierdzeniem usunięcia listy
+                .sheet(item: $editingItem) { item in
+                    EditShoppingListItemView(
+                        shoppingListId: shoppingListId,
+                        productId: item.productId,
+                        productName: item.productName,
+                        quantity: item.quantity
+                    )
+                }
+                .onChange(of: editingItem) { newValue in
+                    if newValue == nil {
+                        Task {
+                            await viewModel.fetchItems()
+                        }
+                    }
+                }
                 .sheet(isPresented: $viewModel.shouldAskToDeleteList) {
                     ZStack {
                         Color("background")
                             .ignoresSafeArea()
 
                         VStack(spacing: 24) {
-                            // Pasek do przeciągania
                             Capsule()
                                 .frame(width: 40, height: 5)
                                 .foregroundStyle(.secondary)
