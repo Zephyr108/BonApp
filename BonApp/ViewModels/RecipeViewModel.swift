@@ -194,7 +194,6 @@ final class RecipeViewModel: ObservableObject {
         error = nil
         defer { isLoading = false }
 
-        // Walidacja
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTitle.isEmpty else {
             let err = "Podaj tytuł przepisu"
@@ -218,7 +217,6 @@ final class RecipeViewModel: ObservableObject {
         var photoURL: String? = nil
 
         do {
-            // (opcjonalnie) upload zdjęcia – zachowujemy identyczny bucket/nazewnictwo jak w wersji legacy
             if let data = imageData {
                 let path = "\(uid)/recipes/\(recipeId).jpg"
                 _ = try await client.storage
@@ -228,7 +226,6 @@ final class RecipeViewModel: ObservableObject {
                 photoURL = try client.storage.from("recipe-images").getPublicURL(path: path).absoluteString
             }
 
-            // 1) recipe (wraz z steps_list)
             let insert = RecipeInsert(
                 id: recipeId,
                 title: trimmedTitle,
@@ -244,7 +241,6 @@ final class RecipeViewModel: ObservableObject {
                 .insert(insert)
                 .execute()
 
-            // 2) recipe_category (jeśli wybrano)
             if !categoryIds.isEmpty {
                 let catPayload = categoryIds.map { RecipeCategoryInsert(recipe_id: recipeId, category_id: $0) }
                 _ = try await client
@@ -253,7 +249,6 @@ final class RecipeViewModel: ObservableObject {
                     .execute()
             }
 
-            // 3) product_in_recipe (jeśli są składniki)
             if !items.isEmpty {
                 let prodPayload = items.map { item in
                     ProductInRecipeInsert(
@@ -268,12 +263,10 @@ final class RecipeViewModel: ObservableObject {
                     .execute()
             }
 
-            // sukces
             self.lastCreatedRecipeId = recipeId
             await fetchRecipes()
             return recipeId
         } catch {
-            // rollback zdjęcia w razie błędu
             if let path = uploadedPath {
                 try? await client.storage.from("recipe-images").remove(paths: [path])
             }
@@ -504,6 +497,24 @@ final class RecipeViewModel: ObservableObject {
 
         guard !missing.isEmpty else {
             return UUID()
+        }
+
+        struct ShoppingListRow: Decodable { let id: UUID }
+        do {
+            let existing: [ShoppingListRow] = try await client
+                .from("shopping_list")
+                .select("id")
+                .eq("user_id", value: uid)
+                .eq("name", value: recipeTitle)
+                .limit(1)
+                .execute()
+                .value
+
+            if let first = existing.first {
+                return first.id
+            }
+        } catch {
+            print("[RecipeViewModel] existing shopping_list check error:", error)
         }
 
         let listId = UUID()
