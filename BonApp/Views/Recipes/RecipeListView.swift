@@ -24,6 +24,25 @@ private struct FavoriteInsert: Encodable {
     let recipe_id: UUID
 }
 
+private struct CircleActionButton: View {
+    let icon: String
+    let title: String
+
+    var body: some View {
+        VStack(spacing: 4) {
+            ZStack {
+                Circle()
+                    .fill(Color("itemsListBackground"))
+                    .frame(width: 40, height: 40)
+                Image(systemName: icon)
+                    .foregroundColor(Color("textPrimary"))
+            }
+            Text(title)
+                .font(.caption2)
+                .foregroundColor(Color("textSecondary"))
+        }
+    }
+}
 
 struct RecipeListView: View {
     @EnvironmentObject var auth: AuthViewModel
@@ -31,7 +50,34 @@ struct RecipeListView: View {
 
     var body: some View {
         NavigationStack {
-            VStack {
+            VStack(spacing: 0) {
+                HStack(spacing: 16) {
+                    NavigationLink {
+                        RecipeSearchView()
+                    } label: {
+                        CircleActionButton(icon: "magnifyingglass", title: "Szukaj")
+                    }
+
+                    NavigationLink {
+                        RecommendationsView()
+                    } label: {
+                        CircleActionButton(icon: "sparkles", title: "Dla Ciebie")
+                    }
+
+                    if auth.isAuthenticated {
+                        NavigationLink {
+                            AddRecipeView()
+                        } label: {
+                            CircleActionButton(icon: "plus", title: "Dodaj")
+                        }
+                    }
+
+                    Spacer()
+                }
+                .padding(.horizontal)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
+
                 List {
                     if viewModel.isLoading {
                         HStack { Spacer(); ProgressView(); Spacer() }
@@ -102,30 +148,10 @@ struct RecipeListView: View {
                 .scrollContentBackground(.hidden)
                 .listStyle(PlainListStyle())
                 .background(Color("background"))
-
-                HStack {
-                    Spacer()
-                    NavigationLink(destination: RecipeSearchView()) {
-                        Label("Wyszukaj przepisy", systemImage: "magnifyingglass")
-                            .font(.headline)
-                    }
-                    Spacer()
-                }
-                .padding(.vertical, 8)
-                .background(Color("background"))
             }
             .background(Color("background").ignoresSafeArea())
             .navigationTitle("Przepisy")
             .foregroundColor(Color("textPrimary"))
-            .toolbar {
-                if auth.isAuthenticated {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        NavigationLink(destination: AddRecipeView()) {
-                            Image(systemName: "plus")
-                        }
-                    }
-                }
-            }
             .navigationDestination(for: RecipeListItem.self) { recipe in
                 destination(for: recipe)
             }
