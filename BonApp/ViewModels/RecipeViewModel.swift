@@ -469,6 +469,12 @@ final class RecipeViewModel: ObservableObject {
         }
     }
 
+    enum CreateListResult {
+        case created
+        case alreadyExists
+        case noMissing
+    }
+
     // MARK: - Shopping list for missing items
 
     private struct ShoppingListInsert: Encodable {
@@ -485,7 +491,7 @@ final class RecipeViewModel: ObservableObject {
         let product_id: Int
     }
 
-    func createShoppingListForMissingItems(recipeId: UUID, recipeTitle: String) async throws -> UUID {
+    func createShoppingListForMissingItems(recipeId: UUID, recipeTitle: String) async throws -> CreateListResult {
         guard let uid = await resolveCurrentUserId() else {
             let err = "Brak zalogowanego użytkownika"
             await MainActor.run { self.error = err }
@@ -496,7 +502,7 @@ final class RecipeViewModel: ObservableObject {
         let missing = availability.filter { $0.missingQuantity > 0.0001 }
 
         guard !missing.isEmpty else {
-            return UUID()
+            return .noMissing
         }
 
         struct ShoppingListRow: Decodable { let id: UUID }
@@ -510,8 +516,8 @@ final class RecipeViewModel: ObservableObject {
                 .execute()
                 .value
 
-            if let first = existing.first {
-                return first.id
+            if existing.first != nil {
+                return .alreadyExists
             }
         } catch {
             print("[RecipeViewModel] existing shopping_list check error:", error)
@@ -541,7 +547,7 @@ final class RecipeViewModel: ObservableObject {
                 .insert(itemsPayload)
                 .execute()
 
-            return listId
+            return .created
         } catch {
             await MainActor.run { self.error = error.localizedDescription }
             throw error

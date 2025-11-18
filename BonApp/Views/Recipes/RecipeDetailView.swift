@@ -231,12 +231,28 @@ struct RecipeDetailView: View {
                                 isCreatingShoppingList = true
                                 defer { isCreatingShoppingList = false }
                                 do {
-                                    _ = try await recipeVM.createShoppingListForMissingItems(
+                                    let result = try await recipeVM.createShoppingListForMissingItems(
                                         recipeId: recipe.id,
                                         recipeTitle: recipe.title.isEmpty ? "Lista zakupów" : recipe.title
                                     )
-                                    // Tu opcjonalnie można dodać komunikat o sukcesie
-                                    print("Utworzono listę zakupów dla brakujących produktów.")
+
+                                    await MainActor.run {
+                                        switch result {
+                                        case .created:
+                                            favoriteMessage = "Lista zakupów została utworzona!"
+                                        case .alreadyExists:
+                                            favoriteMessage = "Taka lista zakupów już istnieje."
+                                        case .noMissing:
+                                            favoriteMessage = "Masz już wszystkie składniki w spiżarni."
+                                        }
+                                    }
+
+                                    Task {
+                                        try? await Task.sleep(nanoseconds: 2_000_000_000)
+                                        await MainActor.run {
+                                            favoriteMessage = nil
+                                        }
+                                    }
                                 } catch {
                                     print("[RecipeDetailView] createShoppingListForMissingItems error:", error)
                                 }
