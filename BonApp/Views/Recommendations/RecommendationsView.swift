@@ -8,76 +8,120 @@ struct RecommendationsView: View {
         NavigationStack {
             ZStack {
                 Color("background").ignoresSafeArea()
-                Form {
-                    Section {
-                        Toggle("Szybkie (≤ 30 min)", isOn: $viewModel.filterQuick)
-                            .tint(Color("accent"))
-                        Toggle("Wegetariańskie", isOn: $viewModel.filterVegetarian)
-                            .tint(Color("accent"))
-                        Stepper(value: $viewModel.maxMissingIngredients, in: 0...5) {
-                            Text("Max brakujących składników: \(viewModel.maxMissingIngredients)")
-                                .foregroundColor(Color("textPrimary"))
-                        }
-                        .tint(Color("accent"))
-                    } header: {
-                        Text("Filtry")
-                            .foregroundColor(Color("textSecondary"))
-                    }
 
-                    Section {
-                        if viewModel.isLoading {
-                            HStack { Spacer(); ProgressView(); Spacer() }
-                                .listRowBackground(Color.clear)
-                        } else if let error = viewModel.error {
-                            Text("Błąd: \(error)")
-                                .foregroundColor(.secondary)
-                                .padding(8)
-                                .background(Color("itemsListBackground"))
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                        } else if viewModel.recommendations.isEmpty {
-                            Text("Brak rekomendacji dla obecnych filtrów i zawartości spiżarni.")
-                                .foregroundColor(Color("textSecondary"))
-                                .padding(8)
-                                .background(Color("itemsListBackground"))
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                        } else {
-                            List(viewModel.recommendations, id: \.id) { item in
-                                NavigationLink(destination: RecipeDetailView(recipe: RecipeDetailItem(
-                                    id: item.id,
-                                    title: item.title,
-                                    detail: nil,
-                                    cookTime: item.cookTime,
-                                    imageURL: item.imageURL,
-                                    ingredients: [],
-                                    isPublic: item.isPublic,
-                                    userId: item.authorId,
-                                    steps: []
-                                ))) {
-                                    RecipeRowView(recipe: item)
-                                        .padding(8)
-                                        .background(Color("itemsListBackground"))
-                                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                                }
-                            }
-                        }
-                    } header: {
-                        Text("Rekomendacje")
-                            .foregroundColor(Color("textSecondary"))
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+
+                        recommendationsBlock(
+                            title: "Na podstawie preferencji",
+                            items: viewModel.recommendedByPreferences,
+                            emptyMessage: "Brak rekomendacji na podstawie preferencji."
+                        )
+
+                        recommendationsBlock(
+                            title: "Na podstawie spiżarni",
+                            items: viewModel.recommendedByPantry,
+                            emptyMessage: "Brak rekomendacji na podstawie zawartości spiżarni."
+                        )
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
                 }
-                .scrollContentBackground(.hidden)
-                .listStyle(.plain)
             }
             .navigationTitle("Rekomendacje")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Odśwież") { Task { await viewModel.fetchRecommendations(for: auth.currentUser?.id) } }
+                    Button("Odśwież") {
+                        Task {
+                            await loadRecommendations()
+                        }
+                    }
                 }
             }
-            .task { await viewModel.fetchRecommendations(for: auth.currentUser?.id) }
-            .onChange(of: viewModel.filterQuick) { _, _ in Task { await viewModel.fetchRecommendations(for: auth.currentUser?.id) } }
-            .onChange(of: viewModel.filterVegetarian) { _, _ in Task { await viewModel.fetchRecommendations(for: auth.currentUser?.id) } }
-            .onChange(of: viewModel.maxMissingIngredients) { _, _ in Task { await viewModel.fetchRecommendations(for: auth.currentUser?.id) } }
+            .task {
+                await loadRecommendations()
+            }
+        }
+    }
+
+    private func loadRecommendations() async {
+        if let idString = auth.currentUser?.id,
+           let userUUID = UUID(uuidString: idString) {
+            await viewModel.fetchRecommendations(for: userUUID)
+        } else {
+            await viewModel.fetchRecommendations(for: nil)
+        }
+    }
+
+    // MARK: - Blok z rekomendacjami
+
+    @ViewBuilder
+    private func recommendationsBlock(
+        title: String,
+        items: [RecommendationsViewModel.RecommendedRecipe],
+        emptyMessage: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.headline)
+                .foregroundColor(Color("textSecondary"))
+
+            if viewModel.isLoading {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                }
+            } else if let error = viewModel.error {
+                Text("Błąd: \(error)")
+                    .foregroundColor(.secondary)
+                    .padding(8)
+                    .background(Color("itemsListBackground"))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            } else if items.isEmpty {
+                Text(emptyMessage)
+                    .foregroundColor(Color("textSecondary"))
+                    .padding(8)
+                    .background(Color("itemsListBackground"))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            } else {
+                VStack(spacing: 12) {
+                    ForEach(items) { recommended in
+                        NavigationLink {
+                            RecipeDetailView(
+                                recipe: RecipeDetailItem(
+                                    id: recommended.id,
+                                    title: recommended.title,
+                                    detail: "",
+                                    cookTime: recommended.cookTime,
+                                    imageURL: recommended.imageURL,
+                                    ingredients: [],
+                                    isPublic: recommended.isPublic,
+                                    userId: recommended.authorId,
+                                    steps: []
+                                )
+                            )
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(recommended.title)
+                                    .font(.headline)
+                                    .foregroundColor(Color("textPrimary"))
+                                Text("Czas: \(recommended.cookTime) min")
+                                    .font(.subheadline)
+                                    .foregroundColor(Color("textSecondary"))
+                                if !recommended.categories.isEmpty {
+                                    Text(recommended.categories.joined(separator: ", "))
+                                        .font(.footnote)
+                                        .foregroundColor(Color("textSecondary"))
+                                }
+                            }
+                            .padding(12)
+                            .background(Color("itemsListBackground"))
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                        }
+                    }
+                }
+            }
         }
     }
 }
