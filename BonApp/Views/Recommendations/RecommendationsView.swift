@@ -85,7 +85,7 @@ struct RecommendationsView: View {
                     .background(Color("itemsListBackground"))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
             } else {
-                VStack(spacing: 12) {
+                VStack(spacing: 16) {
                     ForEach(items) { recommended in
                         NavigationLink {
                             RecipeDetailView(
@@ -102,22 +102,50 @@ struct RecommendationsView: View {
                                 )
                             )
                         } label: {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(recommended.title)
-                                    .font(.headline)
-                                    .foregroundColor(Color("textPrimary"))
-                                Text("Czas: \(recommended.cookTime) min")
-                                    .font(.subheadline)
-                                    .foregroundColor(Color("textSecondary"))
-                                if !recommended.categories.isEmpty {
-                                    Text(recommended.categories.joined(separator: ", "))
-                                        .font(.footnote)
-                                        .foregroundColor(Color("textSecondary"))
+                            HStack(spacing: 12) {
+                                AsyncImage(
+                                    url: recommended.imageURL.flatMap { URL(string: $0) }
+                                ) { phase in
+                                    switch phase {
+                                    case .success(let image):
+                                        image
+                                            .resizable()
+                                            .scaledToFill()
+                                    default:
+                                        Color("itemsListBackground")
+                                    }
                                 }
+                                .frame(width: 72, height: 72)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(recommended.title)
+                                        .font(.headline)
+                                        .foregroundColor(Color("textPrimary"))
+
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "clock")
+                                            .font(.subheadline)
+                                        Text("\(recommended.cookTime) min")
+                                    }
+                                    .foregroundColor(Color("textSecondary"))
+                                    .font(.subheadline)
+
+                                    if !recommended.categories.isEmpty {
+                                        Text(recommended.categories.joined(separator: ", "))
+                                            .font(.footnote)
+                                            .foregroundColor(Color("textSecondary"))
+                                    }
+                                }
+
+                                Spacer()
+
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(Color("textSecondary"))
                             }
                             .padding(12)
                             .background(Color("itemsListBackground"))
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                         }
                     }
                 }
