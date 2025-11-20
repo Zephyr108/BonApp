@@ -24,6 +24,11 @@ private struct FavoriteInsert: Encodable {
     let recipe_id: UUID
 }
 
+private enum RecipeListTab {
+    case others
+    case mine
+}
+
 private struct CircleActionButton: View {
     let icon: String
     let title: String
@@ -47,6 +52,11 @@ private struct CircleActionButton: View {
 struct RecipeListView: View {
     @EnvironmentObject var auth: AuthViewModel
     @StateObject private var viewModel = RecipeListViewModel()
+    @State private var selectedTab: RecipeListTab = .others
+
+    private var effectiveTab: RecipeListTab {
+        auth.isAuthenticated ? selectedTab : .others
+    }
 
     var body: some View {
         NavigationStack {
@@ -58,10 +68,12 @@ struct RecipeListView: View {
                         CircleActionButton(icon: "magnifyingglass", title: "Szukaj")
                     }
 
-                    NavigationLink {
-                        RecommendationsView()
-                    } label: {
-                        CircleActionButton(icon: "sparkles", title: "Dla Ciebie")
+                    if auth.isAuthenticated {
+                        NavigationLink {
+                            RecommendationsView()
+                        } label: {
+                            CircleActionButton(icon: "sparkles", title: "Dla Ciebie")
+                        }
                     }
 
                     if auth.isAuthenticated {
@@ -78,6 +90,40 @@ struct RecipeListView: View {
                 .padding(.top, 8)
                 .padding(.bottom, 4)
 
+                HStack(spacing: 8) {
+                    Button {
+                        selectedTab = .others
+                    } label: {
+                        Text("Przepisy użytkowników")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(effectiveTab == .others ? Color("itemsListBackground") : Color.clear)
+                            )
+                            .foregroundColor(Color("textPrimary"))
+                    }
+
+                    if auth.isAuthenticated {
+                        Button {
+                            selectedTab = .mine
+                        } label: {
+                            Text("Moje przepisy")
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(effectiveTab == .mine ? Color("itemsListBackground") : Color.clear)
+                                )
+                                .foregroundColor(Color("textPrimary"))
+                        }
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 8)
+
                 List {
                     if viewModel.isLoading {
                         HStack { Spacer(); ProgressView(); Spacer() }
@@ -91,38 +137,8 @@ struct RecipeListView: View {
                             .listRowBackground(Color.clear)
                     }
 
-                    Section(header: Text("Moje przepisy").foregroundColor(Color("textSecondary"))) {
-                        ForEach(viewModel.myRecipes) { recipe in
-                            NavigationLink(value: recipe) {
-                                RecipeRowView(recipe: RecipeItem(
-                                    id: recipe.id,
-                                    title: recipe.title,
-                                    cookTime: recipe.cookTime,
-                                    imageURL: recipe.imageURL,
-                                    isPublic: recipe.isPublic,
-                                    authorId: recipe.authorId,
-                                    isFavorite: viewModel.favorites.contains(recipe.id)
-                                ))
-                                .padding(8)
-                                .background(Color("itemsListBackground"))
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                                .contentShape(Rectangle())
-                            }
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
-                            .onTapGesture(count: 2) { toggleFavorite(for: recipe.id) }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                Button(role: .destructive) {
-                                    Task {
-                                        await viewModel.deleteRecipe(recipe.id)
-                                        await viewModel.refresh(currentUserId: auth.currentUser?.id)
-                                    }
-                                } label: { Label("Usuń", systemImage: "trash") }
-                            }
-                        }
-                    }
-
-                    Section(header: Text("Przepisy użytkowników").foregroundColor(Color("textSecondary"))) {
+                    switch effectiveTab {
+                    case .others:
                         ForEach(viewModel.otherRecipes) { recipe in
                             NavigationLink(value: recipe) {
                                 RecipeRowView(recipe: RecipeItem(
@@ -141,7 +157,35 @@ struct RecipeListView: View {
                             }
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
-                            .onTapGesture(count: 2) { toggleFavorite(for: recipe.id) }
+                        }
+
+                    case .mine:
+                        ForEach(viewModel.myRecipes) { recipe in
+                            NavigationLink(value: recipe) {
+                                RecipeRowView(recipe: RecipeItem(
+                                    id: recipe.id,
+                                    title: recipe.title,
+                                    cookTime: recipe.cookTime,
+                                    imageURL: recipe.imageURL,
+                                    isPublic: recipe.isPublic,
+                                    authorId: recipe.authorId,
+                                    isFavorite: viewModel.favorites.contains(recipe.id)
+                                ))
+                                .padding(8)
+                                .background(Color("itemsListBackground"))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .contentShape(Rectangle())
+                            }
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button(role: .destructive) {
+                                    Task {
+                                        await viewModel.deleteRecipe(recipe.id)
+                                        await viewModel.refresh(currentUserId: auth.currentUser?.id)
+                                    }
+                                } label: { Label("Usuń", systemImage: "trash") }
+                            }
                         }
                     }
                 }
@@ -165,6 +209,11 @@ struct RecipeListView: View {
                     let uid = await auth.resolveActiveUserId()
                     print("UID changed →", uid ?? "nil")
                     await viewModel.refresh(currentUserId: uid)
+                }
+            }
+            .onChange(of: auth.isAuthenticated, initial: false) { _, isAuthenticated in
+                if !isAuthenticated {
+                    selectedTab = .others
                 }
             }
         }
