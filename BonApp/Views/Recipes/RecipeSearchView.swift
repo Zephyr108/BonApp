@@ -46,8 +46,8 @@ struct RecipeSearchView: View {
                                     Text(cat)
                                         .padding(.horizontal, 12)
                                         .padding(.vertical, 6)
-                                        .background(viewModel.selectedCategories.contains(cat) ? Color("accent") : Color("itemsListBackground"))
-                                        .foregroundColor(viewModel.selectedCategories.contains(cat) ? .white : Color("textPrimary"))
+                                        .background(viewModel.selectedCategories.contains(cat) ? Color("addActive") : Color("itemsListBackground"))
+                                        .foregroundColor(viewModel.selectedCategories.contains(cat) ? Color("textPrimary") : Color("textPrimary"))
                                         .clipShape(RoundedRectangle(cornerRadius: 10))
                                 }
                             }
