@@ -16,6 +16,7 @@ struct ProfileSetupView: View {
     @State private var preferences: String = ""
     @State private var email: String = ""
     @State private var password: String = ""
+    @State private var availableCategories: [String] = []
 
     var body: some View {
         NavigationStack {
@@ -69,11 +70,9 @@ struct ProfileSetupView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                     Menu {
-                        Button("Danie główne") { preferences = "Danie główne" }
-                        Button("Deser") { preferences = "Deser" }
-                        Button("Sałatka") { preferences = "Sałatka" }
-                        Button("Fast food domowy") { preferences = "Fast food domowy" }
-                        Button("Przekąska") { preferences = "Przekąska" }
+                        ForEach(availableCategories, id: \.self) { cat in
+                            Button(cat) { preferences = cat }
+                        }
                     } label: {
                         HStack {
                             Text(preferences.isEmpty ? "Wybierz preferencje" : preferences)
@@ -136,7 +135,10 @@ struct ProfileSetupView: View {
             .navigationTitle("Ustaw profil")
             .navigationBarTitleDisplayMode(.inline)
             .background(Color("background").ignoresSafeArea())
-            .onAppear { syncFromAuthIfNeeded() }
+            .onAppear { 
+                syncFromAuthIfNeeded()
+                loadCategories()
+            }
             .onChange(of: auth.currentUser, initial: false) { _, _ in syncFromAuthIfNeeded() }
         }
     }
@@ -154,6 +156,31 @@ struct ProfileSetupView: View {
         if username.isEmpty { username = u.username ?? "" }
         if preferences.isEmpty { preferences = u.preferences ?? "" }
         if email.isEmpty { email = u.email }
+    }
+
+    private func loadCategories() {
+        Task {
+            let supabase = SupabaseManager.shared.client
+            
+            do {
+                struct CategoryRow: Decodable {
+                    let name: String
+                }
+
+                let rows: [CategoryRow] = try await supabase
+                    .from("category")
+                    .select("name")
+                    .execute()
+                    .value
+
+                await MainActor.run {
+                    self.availableCategories = rows.map { $0.name }
+                }
+
+            } catch {
+                print("Błąd ładowania kategorii:", error)
+            }
+        }
     }
 
     private func saveProfile() {
