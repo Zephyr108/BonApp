@@ -61,34 +61,48 @@ struct RecipeListView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                HStack(spacing: 16) {
-                    NavigationLink {
-                        RecipeSearchView()
-                    } label: {
-                        CircleActionButton(icon: "magnifyingglass", title: "Szukaj")
-                    }
-
+                HStack {
                     if auth.isAuthenticated {
+                        Spacer()
+
+                        NavigationLink {
+                            RecipeSearchView()
+                        } label: {
+                            CircleActionButton(icon: "magnifyingglass", title: "Szukaj")
+                        }
+
+                        Spacer()
+
                         NavigationLink {
                             RecommendationsView()
                         } label: {
                             CircleActionButton(icon: "sparkles", title: "Dla Ciebie")
                         }
-                    }
 
-                    if auth.isAuthenticated {
+                        Spacer()
+
                         NavigationLink {
                             AddRecipeView()
                         } label: {
                             CircleActionButton(icon: "plus", title: "Dodaj")
                         }
-                    }
 
-                    Spacer()
+                        Spacer()
+                    } else {
+                        Spacer()
+
+                        NavigationLink {
+                            RecipeSearchView()
+                        } label: {
+                            CircleActionButton(icon: "magnifyingglass", title: "Szukaj")
+                        }
+
+                        Spacer()
+                    }
                 }
                 .padding(.horizontal)
                 .padding(.top, 8)
-                .padding(.bottom, 4)
+                .padding(.bottom, 16)
 
                 HStack(spacing: 8) {
                     Button {
@@ -121,6 +135,11 @@ struct RecipeListView: View {
                         }
                     }
                 }
+                .padding(4)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(Color("itemsListBackground").opacity(0.4))
+                )
                 .padding(.horizontal)
                 .padding(.bottom, 8)
 
