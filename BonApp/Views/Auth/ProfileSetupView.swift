@@ -11,6 +11,8 @@ struct ProfileSetupView: View {
     @EnvironmentObject var auth: AuthViewModel
 
     @State private var name: String = ""
+    @State private var lastName: String = ""
+    @State private var username: String = ""
     @State private var preferences: String = ""
     @State private var email: String = ""
     @State private var password: String = ""
@@ -34,11 +36,11 @@ struct ProfileSetupView: View {
                         )
                         .cornerRadius(8)
 
-                    Text("Preferencje kulinarne")
+                    Text("Nazwisko")
                         .foregroundColor(Color("textSecondary"))
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                    TextField("Np. wegetariańskie, szybkie", text: $preferences)
+                    TextField("Wpisz nazwisko", text: $lastName)
                         .foregroundColor(Color("textPrimary"))
                         .padding(16)
                         .background(Color("textfieldBackground"))
@@ -47,6 +49,47 @@ struct ProfileSetupView: View {
                                 .stroke(Color("textfieldBorder"), lineWidth: 1)
                         )
                         .cornerRadius(8)
+
+                    Text("Nazwa użytkownika")
+                        .foregroundColor(Color("textSecondary"))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    TextField("Wpisz nazwę użytkownika", text: $username)
+                        .foregroundColor(Color("textPrimary"))
+                        .padding(16)
+                        .background(Color("textfieldBackground"))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color("textfieldBorder"), lineWidth: 1)
+                        )
+                        .cornerRadius(8)
+
+                    Text("Preferencje kulinarne")
+                        .foregroundColor(Color("textSecondary"))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Menu {
+                        Button("Danie główne") { preferences = "Danie główne" }
+                        Button("Deser") { preferences = "Deser" }
+                        Button("Sałatka") { preferences = "Sałatka" }
+                        Button("Fast food domowy") { preferences = "Fast food domowy" }
+                        Button("Przekąska") { preferences = "Przekąska" }
+                    } label: {
+                        HStack {
+                            Text(preferences.isEmpty ? "Wybierz preferencje" : preferences)
+                                .foregroundColor(Color("textPrimary"))
+                            Spacer()
+                            Image(systemName: "chevron.down")
+                                .foregroundColor(Color("textSecondary"))
+                        }
+                        .padding(16)
+                        .background(Color("textfieldBackground"))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color("textfieldBorder"), lineWidth: 1)
+                        )
+                        .cornerRadius(8)
+                    }
 
                     Text("Email")
                         .foregroundColor(Color("textSecondary"))
@@ -65,11 +108,11 @@ struct ProfileSetupView: View {
                         )
                         .cornerRadius(8)
 
-                    Text("Hasło")
+                    Text("Nowe hasło")
                         .foregroundColor(Color("textSecondary"))
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                    SecureField("Hasło", text: $password)
+                    SecureField("Wpisz nowe hasło", text: $password)
                         .foregroundColor(Color("textPrimary"))
                         .padding(16)
                         .background(Color("textfieldBackground"))
@@ -87,14 +130,6 @@ struct ProfileSetupView: View {
                     .background(canSave ? Color("edit") : Color("textfieldBorder"))
                     .foregroundColor(Color("buttonText"))
                     .cornerRadius(8)
-
-                    Button("Wyloguj") {
-                        Task { await auth.signOut(); dismiss() }
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .background(Color("logout"))
-                    .foregroundColor(Color("buttonText"))
-                    .cornerRadius(8)
                 }
                 .padding()
             }
@@ -108,29 +143,34 @@ struct ProfileSetupView: View {
 
     private var canSave: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !password.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !lastName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private func syncFromAuthIfNeeded() {
         guard let u = auth.currentUser else { return }
         if name.isEmpty { name = u.first_name ?? "" }
+        if lastName.isEmpty { lastName = u.last_name ?? "" }
+        if username.isEmpty { username = u.username ?? "" }
         if preferences.isEmpty { preferences = u.preferences ?? "" }
         if email.isEmpty { email = u.email }
     }
 
     private func saveProfile() {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedLastName = lastName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedPrefs = preferences.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedPass = password.trimmingCharacters(in: .whitespacesAndNewlines)
 
         Task {
             await auth.updateProfile(
                 name: trimmedName,
+                lastName: trimmedLastName,
+                username: trimmedUsername,
                 preferences: trimmedPrefs,
                 email: trimmedEmail,
-                password: trimmedPass
+                password: password.isEmpty ? nil : password
             )
             dismiss()
         }

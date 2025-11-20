@@ -11,6 +11,7 @@ import Supabase
 struct AppUser: Equatable {
     let id: String
     var email: String
+    var username: String?
     var name: String?
     var preferences: String?
     var preferences_array: [String]?
@@ -178,58 +179,56 @@ final class AuthViewModel: ObservableObject {
     }
 
     // MARK: - Update profile (user metadata, email, password)
-    func updateProfile(name: String, preferences: String, email: String, password: String) {
+    func updateProfile(
+        name: String,
+        lastName: String,
+        username: String,
+        preferences: String,
+        email: String,
+        password: String?
+    ) async {
         guard currentUser != nil else {
-            errorMessage = "No authenticated user."
+            self.errorMessage = "No authenticated user."
             return
         }
         guard Validators.isValidEmail(email) else {
-            errorMessage = "InvalidEmail"
-            return
-        }
-        guard Validators.isValidPassword(password) else {
-            errorMessage = "WeakPassword"
+            self.errorMessage = "InvalidEmail"
             return
         }
         guard Validators.isNonEmpty(name) else {
-            errorMessage = "Name cannot be empty"
+            self.errorMessage = "Name cannot be empty"
             return
         }
 
-        Task { @MainActor in
-            do {
-                let parts = name.split(separator: " ")
-                let first = parts.first.map(String.init) ?? name
-                let last = parts.dropFirst().joined(separator: " ")
-                let lastOrNil = last.isEmpty ? nil : last
+        let prefsArray = preferences
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
 
-                try await client.auth.update(
-                    user: UserAttributes(
-                        email: email,
-                        password: password
-                    )
-                )
+        do {
+            let update = DBUserUpdate(
+                email: email,
+                username: username.isEmpty ? nil : username,
+                first_name: name,
+                last_name: lastName.isEmpty ? nil : lastName,
+                preferences: prefsArray.isEmpty ? nil : prefsArray
+            )
 
-                if let authUser = try? await client.auth.user() {
-                    let prefsArray = preferences.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-                    let update = DBUserUpdate(
-                        email: email,
-                        username: nil,
-                        first_name: first,
-                        last_name: lastOrNil,
-                        preferences: prefsArray.isEmpty ? nil : prefsArray
-                    )
-                    _ = try await client
-                        .from("users")
-                        .update(update)
-                        .eq("id", value: authUser.id.uuidString)
-                        .execute()
-                }
+            if let newPass = password, !newPass.trimmingCharacters(in: .whitespaces).isEmpty {
+                try await client.auth.update(user: UserAttributes(password: newPass))
+            }
+
+            if let authUser = try? await client.auth.user() {
+                _ = try await client
+                    .from("users")
+                    .update(update)
+                    .eq("id", value: authUser.id.uuidString)
+                    .execute()
 
                 await refreshAuthState()
-            } catch {
-                self.errorMessage = "Failed to save profile: \(error.localizedDescription)"
             }
+        } catch {
+            self.errorMessage = "Failed to save profile: \(error.localizedDescription)"
         }
     }
 
@@ -355,6 +354,7 @@ final class AuthViewModel: ObservableObject {
                     nextUser = AppUser(
                         id: row.id,
                         email: authUser.email ?? "",
+                        username: row.username,
                         name: displayName.isEmpty ? row.first_name : displayName,
                         preferences: prefsArray == nil ? nil : prefsString,
                         preferences_array: prefsArray,
@@ -382,6 +382,7 @@ final class AuthViewModel: ObservableObject {
                     nextUser = AppUser(
                         id: authUser.id.uuidString,
                         email: authUser.email ?? "",
+                        username: nil,
                         name: nil,
                         preferences: nil,
                         preferences_array: nil,
