@@ -1,84 +1,6 @@
 import SwiftUI
 import Supabase
 
-// DTO for search results
-struct SearchRecipeItem: Identifiable, Hashable, Decodable {
-    let id: UUID
-    let title: String
-    let description: String?
-    let cookTime: Int
-    let imageURL: String?
-    let isPublic: Bool
-    let userId: String
-
-    enum CodingKeys: String, CodingKey {
-        case id, title, description
-        case cookTime = "prepare_time"
-        case imageURL = "photo"
-        case isPublic = "visibility"
-        case userId = "user_id"
-    }
-}
-
-final class RecipeSearchViewModel: ObservableObject {
-    @Published var results: [SearchRecipeItem] = []
-    @Published var favorites: Set<UUID> = []
-    @Published var isLoading = false
-    @Published var error: String? = nil
-
-    private let client = SupabaseManager.shared.client
-
-    @MainActor
-    func search(query: String, maxCookTime: Int, showOnlyFavorites: Bool, currentUserId: String?) async {
-        guard !isLoading else { return }
-        isLoading = true
-        error = nil
-        defer { isLoading = false }
-
-        do {
-            var favIds: [UUID] = []
-            if let uid = currentUserId {
-                struct FavRow: Decodable { let recipe_id: UUID }
-                let favRows: [FavRow] = try await client
-                    .from("favorite_recipe")
-                    .select("recipe_id")
-                    .eq("user_id", value: uid)
-                    .execute()
-                    .value
-                favIds = favRows.map { $0.recipe_id }
-                self.favorites = Set(favIds)
-            } else {
-                self.favorites = []
-            }
-
-            var rq = client
-                .from("recipe")
-                .select("id,title,description,prepare_time,photo,visibility,user_id")
-
-            rq = rq.lte("prepare_time", value: maxCookTime)
-
-            let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmed.isEmpty {
-                rq = rq.ilike("title", pattern: "%\(trimmed)%")
-            }
-
-            if showOnlyFavorites, !favIds.isEmpty {
-                rq = rq.in("id", values: favIds)
-            }
-
-            let rows: [SearchRecipeItem] = try await rq.order("title", ascending: true).execute().value
-
-            if let uid = currentUserId {
-                self.results = rows.filter { $0.userId == uid || $0.isPublic }
-            } else {
-                self.results = rows.filter { $0.isPublic }
-            }
-        } catch {
-            self.error = error.localizedDescription
-        }
-    }
-}
-
 struct RecipeSearchView: View {
     @EnvironmentObject var auth: AuthViewModel
 
@@ -98,13 +20,41 @@ struct RecipeSearchView: View {
                 }
                 .padding(.horizontal)
 
-                Slider(value: $maxCookTime, in: 0...150, step: 5)
+                Slider(value: $maxCookTime, in: 5...180, step: 5)
                     .tint(Color("accent"))
                     .padding(.horizontal)
 
                 Toggle("Pokaż tylko ulubione", isOn: $showOnlyFavorites)
                     .padding(.horizontal)
                     .toggleStyle(SwitchToggleStyle(tint: Color("toggleButton")))
+
+                VStack(alignment: .leading) {
+                    Text("Filtruj po kategoriach")
+                        .foregroundColor(Color("textPrimary"))
+                        .padding(.horizontal)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack {
+                            ForEach(viewModel.allCategories, id: \.self) { cat in
+                                Button(action: {
+                                    if viewModel.selectedCategories.contains(cat) {
+                                        viewModel.selectedCategories.remove(cat)
+                                    } else {
+                                        viewModel.selectedCategories.insert(cat)
+                                    }
+                                }) {
+                                    Text(cat)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(viewModel.selectedCategories.contains(cat) ? Color("accent") : Color("itemsListBackground"))
+                                        .foregroundColor(viewModel.selectedCategories.contains(cat) ? .white : Color("textPrimary"))
+                                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                }
 
                 if let error = viewModel.error {
                     Text("Błąd: \(error)")
@@ -114,19 +64,12 @@ struct RecipeSearchView: View {
                 List {
                     ForEach(viewModel.results) { recipe in
                         NavigationLink(value: recipe) {
-                            RecipeRowView(recipe: RecipeItem(
-                                id: recipe.id,
+                            SearchResultCardView(
                                 title: recipe.title,
                                 cookTime: recipe.cookTime,
                                 imageURL: recipe.imageURL,
-                                isPublic: recipe.isPublic,
-                                authorId: recipe.userId,
                                 isFavorite: viewModel.favorites.contains(recipe.id)
-                            ))
-                            .padding(8)
-                            .background(Color("itemsListBackground"))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .contentShape(Rectangle())
+                            )
                         }
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
@@ -143,27 +86,40 @@ struct RecipeSearchView: View {
             }
             .task {
                 if path.isEmpty {
-                    await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, currentUserId: auth.currentUser?.id)
+                    await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, categories: viewModel.selectedCategories, currentUserId: auth.currentUser?.id)
                 }
             }
             .onChange(of: searchText, initial: false) { _, _ in
                 if path.isEmpty {
-                    Task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, currentUserId: auth.currentUser?.id) }
+                    Task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, categories: viewModel.selectedCategories, currentUserId: auth.currentUser?.id) }
                 }
             }
             .onChange(of: maxCookTime, initial: false) { _, _ in
                 if path.isEmpty {
-                    Task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, currentUserId: auth.currentUser?.id) }
+                    Task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, categories: viewModel.selectedCategories, currentUserId: auth.currentUser?.id) }
                 }
             }
             .onChange(of: showOnlyFavorites, initial: false) { _, _ in
                 if path.isEmpty {
-                    Task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, currentUserId: auth.currentUser?.id) }
+                    Task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, categories: viewModel.selectedCategories, currentUserId: auth.currentUser?.id) }
+                }
+            }
+            .onChange(of: viewModel.selectedCategories, initial: false) { _, _ in
+                if path.isEmpty {
+                    Task {
+                        await viewModel.search(
+                            query: searchText,
+                            maxCookTime: Int(maxCookTime),
+                            showOnlyFavorites: showOnlyFavorites,
+                            categories: viewModel.selectedCategories,
+                            currentUserId: auth.currentUser?.id
+                        )
+                    }
                 }
             }
             .onChange(of: auth.currentUser?.id, initial: false) { _, _ in
                 if path.isEmpty {
-                    Task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, currentUserId: auth.currentUser?.id) }
+                    Task { await viewModel.search(query: searchText, maxCookTime: Int(maxCookTime), showOnlyFavorites: showOnlyFavorites, categories: viewModel.selectedCategories, currentUserId: auth.currentUser?.id) }
                 }
             }
         }
@@ -181,6 +137,75 @@ struct RecipeSearchView: View {
             userId: recipe.userId,
             steps: []
         ))
+    }
+}
+
+private struct SearchResultCardView: View {
+    let title: String
+    let cookTime: Int
+    let imageURL: String?
+    let isFavorite: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            if let imageURL,
+               let url = URL(string: imageURL) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .empty:
+                        ProgressView()
+                            .frame(width: 72, height: 72)
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 72, height: 72)
+                            .clipped()
+                    case .failure:
+                        Color("itemsListBackground")
+                            .frame(width: 72, height: 72)
+                    @unknown default:
+                        Color("itemsListBackground")
+                            .frame(width: 72, height: 72)
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            } else {
+                Color("itemsListBackground")
+                    .frame(width: 72, height: 72)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundColor(Color("textPrimary"))
+                        .lineLimit(1)
+
+                    if isFavorite {
+                        Image(systemName: "heart.fill")
+                            .foregroundColor(.red)
+                    }
+                }
+
+                HStack(spacing: 4) {
+                    Image(systemName: "clock")
+                    Text("\(cookTime) min")
+                }
+                .font(.subheadline)
+                .foregroundColor(Color("textSecondary"))
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .foregroundColor(Color("textSecondary"))
+        }
+        .padding(12)
+        .background(Color("itemsListBackground"))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .contentShape(Rectangle())
     }
 }
 
