@@ -13,10 +13,11 @@ struct ProfileSetupView: View {
     @State private var name: String = ""
     @State private var lastName: String = ""
     @State private var username: String = ""
-    @State private var preferences: String = ""
+    @State private var selectedPreferences: Set<String> = []
     @State private var email: String = ""
     @State private var password: String = ""
     @State private var availableCategories: [String] = []
+    @State private var showPreferencesList: Bool = false
 
     var body: some View {
         NavigationStack {
@@ -69,25 +70,60 @@ struct ProfileSetupView: View {
                         .foregroundColor(Color("textSecondary"))
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Menu {
-                        ForEach(availableCategories, id: \.self) { cat in
-                            Button(cat) { preferences = cat }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Button {
+                            withAnimation {
+                                showPreferencesList.toggle()
+                            }
+                        } label: {
+                            HStack {
+                                Text(selectedPreferences.isEmpty ? "Wybierz preferencje" : selectedPreferences.joined(separator: ", "))
+                                    .foregroundColor(Color("textPrimary"))
+                                Spacer()
+                                Image(systemName: showPreferencesList ? "chevron.up" : "chevron.down")
+                                    .foregroundColor(Color("textSecondary"))
+                            }
+                            .padding(16)
+                            .background(Color("textfieldBackground"))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color("textfieldBorder"), lineWidth: 1)
+                            )
+                            .cornerRadius(8)
                         }
-                    } label: {
-                        HStack {
-                            Text(preferences.isEmpty ? "Wybierz preferencje" : preferences)
-                                .foregroundColor(Color("textPrimary"))
-                            Spacer()
-                            Image(systemName: "chevron.down")
-                                .foregroundColor(Color("textSecondary"))
+
+                        if showPreferencesList {
+                            VStack(alignment: .leading, spacing: 4) {
+                                ForEach(availableCategories, id: \.self) { cat in
+                                    Button {
+                                        if selectedPreferences.contains(cat) {
+                                            selectedPreferences.remove(cat)
+                                        } else {
+                                            selectedPreferences.insert(cat)
+                                        }
+                                    } label: {
+                                        HStack {
+                                            Text(cat)
+                                                .foregroundColor(Color("textPrimary"))
+                                            Spacer()
+                                            if selectedPreferences.contains(cat) {
+                                                Image(systemName: "checkmark")
+                                                    .foregroundColor(Color("edit"))
+                                            }
+                                        }
+                                        .padding(.vertical, 8)
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 4)
+                            .background(Color("textfieldBackground"))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color("textfieldBorder"), lineWidth: 1)
+                            )
+                            .cornerRadius(8)
                         }
-                        .padding(16)
-                        .background(Color("textfieldBackground"))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color("textfieldBorder"), lineWidth: 1)
-                        )
-                        .cornerRadius(8)
                     }
 
                     Text("Email")
@@ -135,7 +171,7 @@ struct ProfileSetupView: View {
             .navigationTitle("Ustaw profil")
             .navigationBarTitleDisplayMode(.inline)
             .background(Color("background").ignoresSafeArea())
-            .onAppear { 
+            .onAppear {
                 syncFromAuthIfNeeded()
                 loadCategories()
             }
@@ -154,7 +190,10 @@ struct ProfileSetupView: View {
         if name.isEmpty { name = u.first_name ?? "" }
         if lastName.isEmpty { lastName = u.last_name ?? "" }
         if username.isEmpty { username = u.username ?? "" }
-        if preferences.isEmpty { preferences = u.preferences ?? "" }
+        if selectedPreferences.isEmpty {
+            let prefs = (u.preferences ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+            selectedPreferences = Set(prefs)
+        }
         if email.isEmpty { email = u.email }
     }
 
@@ -187,7 +226,7 @@ struct ProfileSetupView: View {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedLastName = lastName.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedPrefs = preferences.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedPrefs = selectedPreferences.joined(separator: ", ")
         let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
 
         Task {
