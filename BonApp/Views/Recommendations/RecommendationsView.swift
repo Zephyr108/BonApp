@@ -4,25 +4,60 @@ struct RecommendationsView: View {
     @EnvironmentObject var auth: AuthViewModel
     @StateObject private var viewModel = RecommendationsViewModel()
 
+    private enum Tab: String, CaseIterable, Identifiable {
+        case preferences = "Moje preferencje"
+        case pantry = "Z mojej spiżarni"
+        case smallShopping = "Małe zakupy"
+
+        var id: Self { self }
+    }
+
+    @State private var selectedTab: Tab = .preferences
+
     var body: some View {
         NavigationStack {
             ZStack {
                 Color("background").ignoresSafeArea()
 
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 16) {
 
-                        recommendationsBlock(
-                            title: "Na podstawie preferencji",
-                            items: viewModel.recommendedByPreferences,
-                            emptyMessage: "Brak rekomendacji na podstawie preferencji."
-                        )
+                        Picker("", selection: $selectedTab) {
+                            ForEach(Tab.allCases) { tab in
+                                Text(tab.rawValue).tag(tab)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.bottom, 8)
 
-                        recommendationsBlock(
-                            title: "Na podstawie spiżarni",
-                            items: viewModel.recommendedByPantry,
-                            emptyMessage: "Brak rekomendacji na podstawie zawartości spiżarni."
-                        )
+                        switch selectedTab {
+                        case .preferences:
+                            recommendationsBlock(
+                                title: "Moje preferencje",
+                                items: viewModel.visiblePreferences,
+                                totalCount: viewModel.recommendedByPreferences.count,
+                                emptyMessage: "Brak rekomendacji na podstawie Twoich preferencji.",
+                                onLoadMore: viewModel.loadMorePreferences
+                            )
+
+                        case .pantry:
+                            recommendationsBlock(
+                                title: "Z mojej spiżarni",
+                                items: viewModel.visiblePantry,
+                                totalCount: viewModel.recommendedByPantry.count,
+                                emptyMessage: "Brak przepisów, które możesz przygotować z aktualnej zawartości spiżarni.",
+                                onLoadMore: viewModel.loadMorePantry
+                            )
+
+                        case .smallShopping:
+                            recommendationsBlock(
+                                title: "Małe zakupy",
+                                items: viewModel.visibleSmallShopping,
+                                totalCount: viewModel.recommendedSmallShopping.count,
+                                emptyMessage: "Brak przepisów, do których brakuje maksymalnie 3 składników.",
+                                onLoadMore: viewModel.loadMoreSmallShopping
+                            )
+                        }
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 16)
@@ -59,7 +94,9 @@ struct RecommendationsView: View {
     private func recommendationsBlock(
         title: String,
         items: [RecommendationsViewModel.RecommendedRecipe],
-        emptyMessage: String
+        totalCount: Int,
+        emptyMessage: String,
+        onLoadMore: @escaping () -> Void
     ) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
@@ -147,6 +184,22 @@ struct RecommendationsView: View {
                             .background(Color("itemsListBackground"))
                             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                         }
+                    }
+
+                    if items.count < totalCount {
+                        Button(action: onLoadMore) {
+                            HStack {
+                                Spacer()
+                                Text("Załaduj więcej")
+                                    .font(.subheadline.bold())
+                                Spacer()
+                            }
+                            .padding(.vertical, 8)
+                            .background(Color("itemsListBackground"))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.top, 4)
                     }
                 }
             }

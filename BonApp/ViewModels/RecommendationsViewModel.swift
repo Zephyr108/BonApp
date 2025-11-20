@@ -15,27 +15,36 @@ final class RecommendationsViewModel: ObservableObject {
         let ingredientProductIds: [Int]
     }
 
-    // MARK: - Wyniki rekomendacji
+    // MARK: - Pełne wyniki rekomendacji
     @Published var recommendedByPreferences: [RecommendedRecipe] = []
     @Published var recommendedByPantry: [RecommendedRecipe] = []
+    @Published var recommendedSmallShopping: [RecommendedRecipe] = []
+
+    // MARK: - Widoczne elementy
+    @Published var visiblePreferences: [RecommendedRecipe] = []
+    @Published var visiblePantry: [RecommendedRecipe] = []
+    @Published var visibleSmallShopping: [RecommendedRecipe] = []
 
     @Published var isLoading: Bool = false
     @Published var error: String?
 
     private let client = SupabaseManager.shared.client
 
+    // paginacja
+    private let pageSize = 5
+
+    // MARK: - Public API
+
     @MainActor
     func fetchRecommendations(for userId: UUID?) async {
         await refresh(userId: userId?.uuidString)
     }
 
-    // MARK: - Public API
     @MainActor
     func refresh(userId: String?) async {
-        guard let userId else {
+        guard let userId = userId else {
             self.error = "Brak zalogowanego użytkownika."
-            self.recommendedByPreferences = []
-            self.recommendedByPantry = []
+            clearAll()
             return
         }
 
@@ -45,18 +54,18 @@ final class RecommendationsViewModel: ObservableObject {
 
         do {
             let prefs: [String] = try await fetchUserPreferences(userId: userId)
-
             let allRecipes = try await fetchAllRecipes(userId: userId)
-
             let pantry = try await fetchPantry(userId: userId)
 
             self.recommendedByPreferences = filterByPreferences(recipes: allRecipes, preferences: prefs)
             self.recommendedByPantry = filterByPantry(recipes: allRecipes, pantry: pantry)
+            self.recommendedSmallShopping = filterSmallShopping(recipes: allRecipes, pantry: pantry)
+
+            resetPagination()
 
         } catch {
             self.error = error.localizedDescription
-            self.recommendedByPreferences = []
-            self.recommendedByPantry = []
+            clearAll()
         }
     }
 
@@ -92,7 +101,9 @@ final class RecommendationsViewModel: ObservableObject {
             let category: CategoryRow
         }
 
-        struct CategoryRow: Decodable { let name: String }
+        struct CategoryRow: Decodable {
+            let name: String
+        }
 
         struct IngredientRow: Decodable {
             let recipe_id: UUID
@@ -177,14 +188,68 @@ final class RecommendationsViewModel: ObservableObject {
     private func filterByPantry(recipes: [RecommendedRecipe], pantry: [Int: Double]) -> [RecommendedRecipe] {
         recipes.filter { recipe in
             guard !recipe.ingredientProductIds.isEmpty else { return false }
-
-            let total = recipe.ingredientProductIds.count
-            let owned = recipe.ingredientProductIds.filter { pantry[$0] != nil }.count
-
-            return Double(owned) / Double(total) >= 0.5
+            // brakujący produkt ⇒ nie wchodzimy na tę listę
+            let missing = recipe.ingredientProductIds.filter { pantry[$0] == nil }
+            return missing.isEmpty
         }
     }
+
+    private func filterSmallShopping(recipes: [RecommendedRecipe], pantry: [Int: Double]) -> [RecommendedRecipe] {
+        recipes.filter { recipe in
+            guard !recipe.ingredientProductIds.isEmpty else { return false }
+            let missing = recipe.ingredientProductIds.filter { pantry[$0] == nil }
+            return (1...3).contains(missing.count)
+        }
+    }
+
+    // MARK: - Paginacja
+
+    private func resetPagination() {
+        // pierwsza "strona" 5 pozycji w każdej zakładce
+        visiblePreferences = Array(recommendedByPreferences.prefix(pageSize))
+        visiblePantry = Array(recommendedByPantry.prefix(pageSize))
+        visibleSmallShopping = Array(recommendedSmallShopping.prefix(pageSize))
+    }
+
+    func loadMorePreferences() {
+        guard visiblePreferences.count < recommendedByPreferences.count else { return }
+        let current = visiblePreferences.count
+        let end = min(current + pageSize, recommendedByPreferences.count)
+        let slice = recommendedByPreferences[current..<end]
+        visiblePreferences.append(contentsOf: slice)
+    }
+
+    func loadMorePantry() {
+        guard visiblePantry.count < recommendedByPantry.count else { return }
+        let current = visiblePantry.count
+        let end = min(current + pageSize, recommendedByPantry.count)
+        let slice = recommendedByPantry[current..<end]
+        visiblePantry.append(contentsOf: slice)
+    }
+
+    func loadMoreSmallShopping() {
+        guard visibleSmallShopping.count < recommendedSmallShopping.count else { return }
+        let current = visibleSmallShopping.count
+        let end = min(current + pageSize, recommendedSmallShopping.count)
+        let slice = recommendedSmallShopping[current..<end]
+        visibleSmallShopping.append(contentsOf: slice)
+    }
+
+    // MARK: - Helpers
+
+    private func clearAll() {
+        recommendedByPreferences = []
+        recommendedByPantry = []
+        recommendedSmallShopping = []
+
+        visiblePreferences = []
+        visiblePantry = []
+        visibleSmallShopping = []
+    }
+
     var hasNoRecommendations: Bool {
-        recommendedByPreferences.isEmpty && recommendedByPantry.isEmpty
+        recommendedByPreferences.isEmpty &&
+        recommendedByPantry.isEmpty &&
+        recommendedSmallShopping.isEmpty
     }
 }
