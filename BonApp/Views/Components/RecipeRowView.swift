@@ -38,10 +38,11 @@ struct RecipeRowView: View {
                             .clipped()
                             .cornerRadius(6)
                     case .failure:
-                        Rectangle()
-                            .fill(Color.secondary.opacity(0.3))
+                        Image(systemName: "fork.knife.circle.fill")
+                            .resizable()
+                            .scaledToFit()
+                            .foregroundColor(.secondary)
                             .frame(width: 60, height: 60)
-                            .cornerRadius(6)
                     @unknown default:
                         Rectangle()
                             .fill(Color.secondary.opacity(0.3))
@@ -50,10 +51,11 @@ struct RecipeRowView: View {
                     }
                 }
             } else {
-                Rectangle()
-                    .fill(Color.secondary.opacity(0.3))
+                Image(systemName: "fork.knife.circle.fill")
+                    .resizable()
+                    .scaledToFit()
+                    .foregroundColor(.secondary)
                     .frame(width: 60, height: 60)
-                    .cornerRadius(6)
             }
             
             VStack(alignment: .leading, spacing: 4) {
