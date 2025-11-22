@@ -15,67 +15,65 @@ struct RecommendationsView: View {
     @State private var selectedTab: Tab = .preferences
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Color("background").ignoresSafeArea()
+        ZStack {
+            Color("background").ignoresSafeArea()
 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
 
-                        Picker("", selection: $selectedTab) {
-                            ForEach(Tab.allCases) { tab in
-                                Text(tab.rawValue).tag(tab)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .padding(.bottom, 8)
-
-                        switch selectedTab {
-                        case .preferences:
-                            recommendationsBlock(
-                                title: "Moje preferencje",
-                                items: viewModel.visiblePreferences,
-                                totalCount: viewModel.recommendedByPreferences.count,
-                                emptyMessage: "Brak rekomendacji na podstawie Twoich preferencji.",
-                                onLoadMore: viewModel.loadMorePreferences
-                            )
-
-                        case .pantry:
-                            recommendationsBlock(
-                                title: "Z mojej spiżarni",
-                                items: viewModel.visiblePantry,
-                                totalCount: viewModel.recommendedByPantry.count,
-                                emptyMessage: "Brak przepisów, które możesz przygotować z aktualnej zawartości spiżarni.",
-                                onLoadMore: viewModel.loadMorePantry
-                            )
-
-                        case .smallShopping:
-                            recommendationsBlock(
-                                title: "Małe zakupy",
-                                items: viewModel.visibleSmallShopping,
-                                totalCount: viewModel.recommendedSmallShopping.count,
-                                emptyMessage: "Brak przepisów, do których brakuje maksymalnie 3 składników.",
-                                onLoadMore: viewModel.loadMoreSmallShopping
-                            )
+                    Picker("", selection: $selectedTab) {
+                        ForEach(Tab.allCases) { tab in
+                            Text(tab.rawValue).tag(tab)
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
+                    .pickerStyle(.segmented)
+                    .padding(.bottom, 8)
+
+                    switch selectedTab {
+                    case .preferences:
+                        recommendationsBlock(
+                            title: "Moje preferencje",
+                            items: viewModel.visiblePreferences,
+                            totalCount: viewModel.recommendedByPreferences.count,
+                            emptyMessage: "Brak rekomendacji na podstawie Twoich preferencji.",
+                            onLoadMore: viewModel.loadMorePreferences
+                        )
+
+                    case .pantry:
+                        recommendationsBlock(
+                            title: "Z mojej spiżarni",
+                            items: viewModel.visiblePantry,
+                            totalCount: viewModel.recommendedByPantry.count,
+                            emptyMessage: "Brak przepisów, które możesz przygotować z aktualnej zawartości spiżarni.",
+                            onLoadMore: viewModel.loadMorePantry
+                        )
+
+                    case .smallShopping:
+                        recommendationsBlock(
+                            title: "Małe zakupy",
+                            items: viewModel.visibleSmallShopping,
+                            totalCount: viewModel.recommendedSmallShopping.count,
+                            emptyMessage: "Brak przepisów, do których brakuje maksymalnie 3 składników.",
+                            onLoadMore: viewModel.loadMoreSmallShopping
+                        )
+                    }
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
             }
-            .navigationTitle("Rekomendacje")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Odśwież") {
-                        Task {
-                            await loadRecommendations()
-                        }
+        }
+        .navigationTitle("Rekomendacje")
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Odśwież") {
+                    Task {
+                        await loadRecommendations()
                     }
                 }
             }
-            .task {
-                await loadRecommendations()
-            }
+        }
+        .task {
+            await loadRecommendations()
         }
     }
 
