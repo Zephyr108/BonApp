@@ -159,7 +159,9 @@ struct RecipeListView: View {
                     switch effectiveTab {
                     case .others:
                         ForEach(viewModel.otherRecipes) { recipe in
-                            NavigationLink(value: recipe) {
+                            NavigationLink {
+                                destination(for: recipe)
+                            } label: {
                                 RecipeRowView(recipe: RecipeItem(
                                     id: recipe.id,
                                     title: recipe.title,
@@ -180,7 +182,9 @@ struct RecipeListView: View {
 
                     case .mine:
                         ForEach(viewModel.myRecipes) { recipe in
-                            NavigationLink(value: recipe) {
+                            NavigationLink {
+                                destination(for: recipe)
+                            } label: {
                                 RecipeRowView(recipe: RecipeItem(
                                     id: recipe.id,
                                     title: recipe.title,
@@ -215,9 +219,6 @@ struct RecipeListView: View {
             .background(Color("background").ignoresSafeArea())
             .navigationTitle("Przepisy")
             .foregroundColor(Color("textPrimary"))
-            .navigationDestination(for: RecipeListItem.self) { recipe in
-                destination(for: recipe)
-            }
             .task {
                 let uid = await auth.resolveActiveUserId()
                 print("Active UID:", uid ?? "nil")
