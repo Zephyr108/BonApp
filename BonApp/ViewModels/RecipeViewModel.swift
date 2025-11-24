@@ -491,6 +491,61 @@ final class RecipeViewModel: ObservableObject {
         let product_id: Int
     }
 
+    // MARK: - Execute recipe (consume pantry)
+
+    private struct PantryQuantityUpdate: Encodable {
+        let quantity: Double
+    }
+
+    enum ExecuteRecipeResult {
+        case executed
+        case missing([IngredientAvailability])
+        case notAuthenticated
+        case error(String)
+    }
+
+    func executeRecipe(recipeId: UUID) async -> ExecuteRecipeResult {
+        guard let uid = await resolveCurrentUserId() else {
+            await MainActor.run { self.error = "Brak zalogowanego użytkownika" }
+            return .notAuthenticated
+        }
+
+        do {
+            let availability = try await ingredientsAvailability(for: recipeId)
+
+            let missing = availability.filter { !$0.isAvailable }
+            guard missing.isEmpty else {
+                return .missing(missing)
+            }
+
+            for item in availability {
+                let newQuantity = item.inPantryQuantity - item.requiredQuantity
+
+                if newQuantity > 0.0001 {
+                    let payload = PantryQuantityUpdate(quantity: newQuantity)
+                    _ = try await client
+                        .from("pantry")
+                        .update(payload)
+                        .eq("user_id", value: uid)
+                        .eq("product_id", value: item.productId)
+                        .execute()
+                } else {
+                    _ = try await client
+                        .from("pantry")
+                        .delete()
+                        .eq("user_id", value: uid)
+                        .eq("product_id", value: item.productId)
+                        .execute()
+                }
+            }
+
+            return .executed
+        } catch {
+            await MainActor.run { self.error = error.localizedDescription }
+            return .error(error.localizedDescription)
+        }
+    }
+    
     func createShoppingListForMissingItems(recipeId: UUID, recipeTitle: String) async throws -> CreateListResult {
         guard let uid = await resolveCurrentUserId() else {
             let err = "Brak zalogowanego użytkownika"

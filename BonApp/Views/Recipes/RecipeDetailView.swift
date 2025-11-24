@@ -105,6 +105,8 @@ struct RecipeDetailView: View {
     @State private var loadedCategories: [String] = []
     @State private var isFavorite: Bool = false
     @State private var favoriteMessage: String? = nil
+    @State private var showExecuteAlert: Bool = false
+    @State private var executeMessage: String? = nil
 
     private var hasMissingIngredients: Bool {
         ingredientAvailability.contains { !$0.isAvailable }
@@ -274,6 +276,25 @@ struct RecipeDetailView: View {
                         .disabled(isCreatingShoppingList)
                     }
 
+                    if !hasMissingIngredients {
+                        Button {
+                            showExecuteAlert = true
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "checkmark.seal.fill")
+                                Text("Wykonaj przepis!")
+                            }
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color("addActive"))
+                            .foregroundColor(Color("buttonText"))
+                            .cornerRadius(14)
+                            .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+                            .padding(.top, 8)
+                        }
+                    }
+                    
                     if let user = auth.currentUser, user.id == recipe.userId {
                         NavigationLink(destination: EditRecipeView(
                             recipeId: recipe.id,
@@ -313,6 +334,49 @@ struct RecipeDetailView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
+        
+        .overlay(alignment: .bottom) {
+            if let msg = executeMessage {
+                Text(msg)
+                    .font(.subheadline.bold())
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(.ultraThinMaterial)
+                    .cornerRadius(20)
+                    .shadow(radius: 4)
+                    .padding(.bottom, 24)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+
+        .alert("Wykonać przepis?", isPresented: $showExecuteAlert) {
+            Button("Anuluj", role: .cancel) { }
+            Button("Tak", role: .destructive) {
+                Task {
+                    let result = await recipeVM.executeRecipe(recipeId: recipe.id)
+                    await loadIngredientsAvailability()
+
+                    await MainActor.run {
+                        switch result {
+                        case .executed:
+                            executeMessage = "Przepis został wykonany!"
+                        case .missing:
+                            executeMessage = "Brakuje składników – nie można wykonać przepisu."
+                        case .notAuthenticated:
+                            executeMessage = "Zaloguj się, aby wykonać przepis."
+                        case .error:
+                            executeMessage = "Wystąpił błąd podczas wykonywania przepisu."
+                        }
+                    }
+
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    await MainActor.run { executeMessage = nil }
+                }
+            }
+        } message: {
+            Text("Produkty potrzebne do przepisu zostaną odjęte z Twojej spiżarni.")
+        }
+        
         .navigationTitle("Szczegóły przepisu")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
