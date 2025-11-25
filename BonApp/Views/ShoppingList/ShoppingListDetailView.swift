@@ -138,69 +138,68 @@ struct ShoppingListDetailView: View {
                         }
                     }
                 }
-                .sheet(isPresented: $viewModel.shouldAskToDeleteList) {
-                    ZStack {
-                        Color("background")
-                            .ignoresSafeArea()
+                
+                if viewModel.shouldAskToDeleteList {
+                    // Dimmed background
+                    Color.black.opacity(0.35)
+                        .ignoresSafeArea()
 
-                        VStack(spacing: 24) {
-                            Capsule()
-                                .frame(width: 40, height: 5)
-                                .foregroundStyle(.secondary)
-                                .padding(.top, 8)
+                    // Centered alert card
+                    VStack(spacing: 20) {
+                        Text("Wszystkie produkty z listy zostały kupione i już są w spiżarni.")
+                            .font(.headline)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
 
-                            VStack(spacing: 8) {
-                                Text("Wszystkie produkty z listy zostały kupione i już są w spiżarni.")
+                        Text("Czy usunąć listę zakupową?")
+                            .font(.subheadline)
+                            .foregroundColor(Color("textSecondary"))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+
+                        HStack(spacing: 12) {
+                            Button {
+                                // Cancel
+                                withAnimation {
+                                    viewModel.shouldAskToDeleteList = false
+                                }
+                            } label: {
+                                Text("Anuluj")
                                     .font(.headline)
-                                    .multilineTextAlignment(.center)
-                                    .padding(.horizontal)
-
-                                Text("Czy usunąć listę zakupową?")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                    .multilineTextAlignment(.center)
-                                    .padding(.horizontal)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                                    .background(Color("textfieldBackground"))
+                                    .foregroundColor(Color("textPrimary"))
+                                    .cornerRadius(16)
                             }
 
-                            Spacer()
-
-                            VStack(spacing: 12) {
-                                Button(role: .destructive) {
-                                    Task {
-                                        await viewModel.deleteCurrentList()
-                                        await MainActor.run {
+                            Button(role: .destructive) {
+                                Task {
+                                    await viewModel.deleteCurrentList()
+                                    await MainActor.run {
+                                        withAnimation {
                                             viewModel.shouldAskToDeleteList = false
                                             dismiss()
                                         }
                                     }
-                                } label: {
-                                    Text("Usuń listę")
-                                        .font(.headline)
-                                        .frame(maxWidth: .infinity)
-                                        .padding()
-                                        .background(Color.red)
-                                        .foregroundColor(.white)
-                                        .cornerRadius(12)
                                 }
-
-                                Button {
-                                    viewModel.shouldAskToDeleteList = false
-                                } label: {
-                                    Text("Anuluj")
-                                        .font(.headline)
-                                        .frame(maxWidth: .infinity)
-                                        .padding()
-                                        .background(Color(.systemGray5))
-                                        .foregroundColor(.primary)
-                                        .cornerRadius(12)
-                                }
+                            } label: {
+                                Text("Tak")
+                                    .font(.headline)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                                    .background(Color("cancel"))
+                                    .foregroundColor(.white)
+                                    .cornerRadius(16)
                             }
-                            .padding(.horizontal)
-                            .padding(.bottom, 24)
                         }
+                        .padding(.horizontal)
                     }
-                    .presentationDetents([.medium, .large])
-                    .presentationDragIndicator(.visible)
+                    .padding(24)
+                    .background(Color("background"))
+                    .cornerRadius(28)
+                    .shadow(radius: 20)
+                    .padding(.horizontal, 32)
                 }
             }
         }
