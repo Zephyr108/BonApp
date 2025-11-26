@@ -177,22 +177,27 @@ struct AddRecipeView: View {
 
                         let query = productSearch.trimmingCharacters(in: .whitespacesAndNewlines)
                         if query.count >= 1 {
-                            ForEach(allProducts.filter { $0.name.lowercased().contains(query.lowercased()) }.prefix(5)) { prod in
-                                Button {
-                                    selectedProduct = prod
-                                    // przenieś nazwę do wiersza z ilością
-                                    productSearch = ""
-                                } label: {
-                                    HStack {
-                                        Text(prod.name)
-                                            .foregroundColor(.blue)
-                                        Spacer()
-                                        Text(prod.unit ?? "")
-                                            .foregroundColor(Color("textSecondary"))
+                            VStack(spacing: 4) {
+                                ForEach(allProducts.filter { $0.name.lowercased().contains(query.lowercased()) }.prefix(5)) { prod in
+                                    Button {
+                                        selectedProduct = prod
+                                        productSearch = ""
+                                    } label: {
+                                        HStack {
+                                            Text(prod.name)
+                                                .foregroundColor(Color("textPrimary"))
+                                            Spacer()
+                                            Text(prod.unit ?? "")
+                                                .foregroundColor(Color("textSecondary"))
+                                        }
+                                        .padding(.vertical, 6)
+                                        .padding(.horizontal, 12)
+                                        .background(Color("textfieldBackground"))
+                                        .cornerRadius(8)
                                     }
                                 }
-                                .padding(8)
                             }
+                            .padding(.vertical, 4)
                         }
 
                         if let p = selectedProduct {
@@ -267,8 +272,14 @@ struct AddRecipeView: View {
                                 newStepText = ""
                             }
                             .disabled(newStepText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                            .padding(16)
-                            .background(Color("addStep"))
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(
+                                newStepText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                ? Color("addStepInactive")
+                                : Color("addStepActive")
+                            )
+                            .foregroundColor(.black)
                             .cornerRadius(8)
                         }
                     }
