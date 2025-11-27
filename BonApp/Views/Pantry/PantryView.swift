@@ -107,6 +107,64 @@ struct PantryView: View {
     @State private var selectedIds: Set<UUID> = []
     @State private var isSelecting = false
 
+    @ViewBuilder
+    private func pantryRowView(for item: PantryItemRow) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(item.productName)
+                .font(.headline)
+                .foregroundColor(Color("textPrimary"))
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            let qty = item.quantity
+            let quantityString: String = {
+                if qty.truncatingRemainder(dividingBy: 1) == 0 {
+                    return String(Int(qty))
+                } else {
+                    return String(format: "%.2f", qty)
+                }
+            }()
+
+            Text("\(quantityString) \(item.productUnit ?? "")")
+                .font(.subheadline)
+                .foregroundColor(Color("textSecondary"))
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+    }
+
+    @ViewBuilder
+    private func listRow(for item: PantryItemRow) -> some View {
+        if isSelecting {
+            pantryRowView(for: item)
+                .background(rowBackground(for: item.id))
+                .cornerRadius(20)
+                .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 4)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    toggleSelection(for: item.id)
+                }
+                .onLongPressGesture {
+                    isSelecting = true
+                    selectedIds.insert(item.id)
+                }
+        } else {
+            NavigationLink(
+                destination: EditPantryItemView(
+                    itemId: item.id,
+                    productName: item.productName,
+                    unit: item.productUnit ?? ""
+                )
+            ) {
+                pantryRowView(for: item)
+            }
+            .background(rowBackground(for: item.id))
+            .cornerRadius(20)
+            .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 4)
+            .contentShape(Rectangle())
+        }
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -131,51 +189,17 @@ struct PantryView: View {
                             .listRowSeparator(.hidden)
                     } else {
                         ForEach(viewModel.pantryItems) { item in
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(item.productName)
-                                    .font(.headline)
-                                    .foregroundColor(Color("textPrimary"))
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                                let qty = item.quantity
-                                let quantityString: String = {
-                                    if qty.truncatingRemainder(dividingBy: 1) == 0 {
-                                        return String(Int(qty))
-                                    } else {
-                                        return String(format: "%.2f", qty)
+                            listRow(for: item)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        Task { await viewModel.deleteItem(item) }
+                                    } label: {
+                                        Label("Usuń", systemImage: "trash")
                                     }
-                                }()
-
-                                Text("\(quantityString) \(item.productUnit ?? "")")
-                                    .font(.subheadline)
-                                    .foregroundColor(Color("textSecondary"))
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 14)
-                            .background(rowBackground(for: item.id))
-                            .cornerRadius(20)
-                            .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 4)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                if isSelecting {
-                                    toggleSelection(for: item.id)
                                 }
-                            }
-                            .onLongPressGesture {
-                                isSelecting = true
-                                selectedIds.insert(item.id)
-                            }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button(role: .destructive) {
-                                    Task { await viewModel.deleteItem(item) }
-                                } label: {
-                                    Label("Usuń", systemImage: "trash")
-                                }
-                            }
-                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
+                                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
                         }
                     }
                 }

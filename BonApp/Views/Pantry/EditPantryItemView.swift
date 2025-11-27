@@ -3,17 +3,18 @@ import Supabase
 
 struct EditPantryItemView: View {
     let itemId: UUID
+    let productName: String
+    let unit: String?
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var auth: AuthViewModel
 
-    @State private var selectedProductId: Int?
     @State private var quantity: String
-    @State private var products: [ProductRow] = []
     @State private var isSaving = false
 
-    init(itemId: UUID, productId: Int? = nil, quantity: String = "") {
+    init(itemId: UUID, productName: String, unit: String?, quantity: String = "") {
         self.itemId = itemId
-        _selectedProductId = State(initialValue: productId)
+        self.productName = productName
+        self.unit = unit
         _quantity = State(initialValue: quantity)
     }
 
@@ -25,22 +26,10 @@ struct EditPantryItemView: View {
                         .foregroundColor(Color("textSecondary"))
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Picker("Wybierz produkt", selection: $selectedProductId) {
-                        ForEach(products) { product in
-                            Text(product.name).tag(Optional(product.id))
-                        }
-                    }
-                    .pickerStyle(MenuPickerStyle())
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    Text("Ilość")
-                        .foregroundColor(Color("textSecondary"))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    TextField("Ilość", text: $quantity)
-                        .keyboardType(.decimalPad)
+                    Text(productName)
                         .foregroundColor(Color("textPrimary"))
                         .padding(16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .background(Color("textfieldBackground"))
                         .overlay(
                             RoundedRectangle(cornerRadius: 8)
@@ -48,11 +37,33 @@ struct EditPantryItemView: View {
                         )
                         .cornerRadius(8)
 
+                    Text("Ilość")
+                        .foregroundColor(Color("textSecondary"))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    HStack {
+                        TextField("Ilość", text: $quantity)
+                            .keyboardType(.decimalPad)
+                            .foregroundColor(Color("textPrimary"))
+
+                        if let unit = unit, !unit.isEmpty {
+                            Text(unit)
+                                .foregroundColor(Color("textSecondary"))
+                        }
+                    }
+                    .padding(16)
+                    .background(Color("textfieldBackground"))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color("textfieldBorder"), lineWidth: 1)
+                    )
+                    .cornerRadius(8)
+
                     Spacer()
                     Button(isSaving ? "Zapisywanie…" : "Zapisz zmiany") {
                         saveChanges()
                     }
-                    .disabled(isSaving || selectedProductId == nil || quantity.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(isSaving || quantity.trimmingCharacters(in: .whitespaces).isEmpty)
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .background(isSaving ? Color("textfieldBorder") : Color("edit"))
                     .foregroundColor(Color("buttonText"))
@@ -63,34 +74,18 @@ struct EditPantryItemView: View {
             .background(Color("background").ignoresSafeArea())
             .navigationTitle("Edytuj pozycję spiżarni")
             .navigationBarTitleDisplayMode(.inline)
-            .task { await loadProducts() }
-        }
-    }
-
-    private func loadProducts() async {
-        do {
-            let rows: [ProductRow] = try await SupabaseManager.shared.client
-                .from("products")
-                .select("id,name,product_category_id")
-                .order("name")
-                .execute()
-                .value
-            self.products = rows
-        } catch {
-            print("Błąd ładowania produktów: \(error.localizedDescription)")
         }
     }
 
     private func saveChanges() {
-        guard let prodId = selectedProductId else { return }
         let qty = Double(quantity.replacingOccurrences(of: ",", with: ".")) ?? 1.0
         isSaving = true
         Task {
             defer { isSaving = false }
             do {
                 let client = SupabaseManager.shared.client
-                struct UpdatePayload: Encodable { let product_id: Int; let quantity: Double }
-                let payload = UpdatePayload(product_id: prodId, quantity: qty)
+                struct UpdatePayload: Encodable { let quantity: Double }
+                let payload = UpdatePayload(quantity: qty)
                 _ = try await client
                     .from("pantry")
                     .update(payload)
@@ -105,16 +100,10 @@ struct EditPantryItemView: View {
     }
 }
 
-private struct ProductRow: Decodable, Identifiable {
-    let id: Int
-    let name: String
-    let product_category_id: Int?
-}
-
 struct EditPantryItemView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            EditPantryItemView(itemId: UUID(), productId: 1, quantity: "2.0")
+            EditPantryItemView(itemId: UUID(), productName: "Makaron", unit: "g", quantity: "2.0")
                 .environmentObject(AuthViewModel())
         }
     }
