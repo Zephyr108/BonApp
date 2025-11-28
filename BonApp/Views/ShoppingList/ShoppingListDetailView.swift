@@ -131,7 +131,7 @@ struct ShoppingListDetailView: View {
                         quantity: item.quantity
                     )
                 }
-                .onChange(of: editingItem) { newValue in
+                .onChange(of: editingItem) { oldValue, newValue in
                     if newValue == nil {
                         Task {
                             await viewModel.fetchItems()
@@ -140,11 +140,9 @@ struct ShoppingListDetailView: View {
                 }
                 
                 if viewModel.shouldAskToDeleteList {
-                    // Dimmed background
                     Color.black.opacity(0.35)
                         .ignoresSafeArea()
 
-                    // Centered alert card
                     VStack(spacing: 20) {
                         Text("Wszystkie produkty z listy zostały kupione i już są w spiżarni.")
                             .font(.headline)
@@ -159,7 +157,6 @@ struct ShoppingListDetailView: View {
 
                         HStack(spacing: 12) {
                             Button {
-                                // Cancel
                                 withAnimation {
                                     viewModel.shouldAskToDeleteList = false
                                 }

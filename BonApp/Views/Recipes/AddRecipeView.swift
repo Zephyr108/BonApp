@@ -337,16 +337,6 @@ struct AddRecipeView: View {
     }
 
     private func saveRecipe() async {
-        var userUUID: UUID?
-        if let idStr = auth.currentUser?.id, let u = UUID(uuidString: idStr) {
-            userUUID = u
-        } else if let session = try? await SupabaseManager.shared.client.auth.session {
-            userUUID = session.user.id
-        }
-        guard let ownerId = userUUID else {
-            await MainActor.run { errorMessage = "Brak lub niepoprawne ID zalogowanego użytkownika." }
-            return
-        }
         isSaving = true
         errorMessage = nil
         defer { isSaving = false }
@@ -355,7 +345,7 @@ struct AddRecipeView: View {
 
         do {
             let imageData = selectedImage?.jpegData(compressionQuality: 0.85)
-            let id = try await recipeVM.addRecipeFull(
+            _ = try await recipeVM.addRecipeFull(
                 title: title,
                 description: detail,
                 steps: stepTexts,

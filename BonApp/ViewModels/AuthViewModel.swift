@@ -308,34 +308,6 @@ final class AuthViewModel: ObservableObject {
                 return
             }
 
-            do {
-                let meta = authUser.userMetadata
-                func cleaned(_ s: String?) -> String? {
-                    let t = (s ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-                    if t.isEmpty { return nil }
-                    if t.uppercased() == "EMPTY" { return nil }
-                    return t
-                }
-                let u = cleaned(meta["username"] as? String)
-                let f = cleaned(meta["first_name"] as? String)
-                let l = cleaned(meta["last_name"] as? String)
-                let p = meta["preferences"] as? [String]
-
-                let ensure = DBUserUpdate(
-                    email: authUser.email ?? "",
-                    username: u,
-                    first_name: f,
-                    last_name: l,
-                    preferences: p
-                )
-                _ = try await client
-                    .from("users")
-                    .update(ensure)
-                    .eq("id", value: authUser.id.uuidString)
-                    .execute()
-            } catch {
-            }
-
             var nextUser: AppUser
             do {
                 let rows: [DBUserRow] = try await client

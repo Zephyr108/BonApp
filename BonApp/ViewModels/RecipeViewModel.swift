@@ -268,7 +268,9 @@ final class RecipeViewModel: ObservableObject {
             return recipeId
         } catch {
             if let path = uploadedPath {
-                try? await client.storage.from("recipe-images").remove(paths: [path])
+                _ = try? await client.storage
+                    .from("recipe-images")
+                    .remove(paths: [path])
             }
             self.error = error.localizedDescription
             throw error
@@ -289,14 +291,12 @@ final class RecipeViewModel: ObservableObject {
         do {
             var payloadNoPhoto: RecipeUpdateNoPhoto? = nil
             var payloadWithPhoto: RecipeUpdateWithPhoto? = nil
-            var uploadedPath: String? = nil
 
             if let data = newImageData {
                 let path = "\(user_id)/recipes/\(id).jpg"
                 _ = try await client.storage
                     .from("recipe-images")
                     .upload(path, data: data, options: FileOptions(cacheControl: "3600", contentType: "image/jpeg", upsert: true))
-                uploadedPath = path
                 let publicURL = try client.storage.from("recipe-images").getPublicURL(path: path).absoluteString
                 payloadWithPhoto = RecipeUpdateWithPhoto(
                     description: description,
@@ -343,7 +343,9 @@ final class RecipeViewModel: ObservableObject {
 
             if let uid = currentUserId {
                 let path = "\(uid)/recipes/\(id).jpg"
-                try? await client.storage.from("recipe-images").remove(paths: [path])
+                _ = try? await client.storage
+                    .from("recipe-images")
+                    .remove(paths: [path])
             }
 
             await fetchRecipes()

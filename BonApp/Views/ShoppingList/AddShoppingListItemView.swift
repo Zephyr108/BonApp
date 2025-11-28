@@ -53,7 +53,7 @@ struct AddShoppingListItemView: View {
                         .padding(.vertical, 10)
                         .background(Color(.systemBackground))
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .onChange(of: searchText) { newValue in
+                        .onChange(of: searchText) { oldValue, newValue in
                             Task { await searchProducts(matching: newValue) }
                         }
                     
