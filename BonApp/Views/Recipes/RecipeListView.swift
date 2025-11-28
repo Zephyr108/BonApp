@@ -221,13 +221,13 @@ struct RecipeListView: View {
             .foregroundColor(Color("textPrimary"))
             .task {
                 let uid = await auth.resolveActiveUserId()
-                print("Active UID:", uid ?? "nil")
+                //print("Active UID:", uid ?? "nil")
                 await viewModel.refresh(currentUserId: uid)
             }
             .onChange(of: auth.currentUser?.id, initial: false) { _, _ in
                 Task {
                     let uid = await auth.resolveActiveUserId()
-                    print("UID changed →", uid ?? "nil")
+                    //print("UID changed →", uid ?? "nil")
                     await viewModel.refresh(currentUserId: uid)
                 }
             }

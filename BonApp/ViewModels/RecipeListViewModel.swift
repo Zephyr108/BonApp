@@ -60,9 +60,9 @@ final class RecipeListViewModel: ObservableObject {
                 let u = uid.lowercased()
                 self.myRecipes = rows.filter { $0.authorId.lowercased() == u }
                 self.otherRecipes = rows.filter { $0.isPublic && $0.authorId.lowercased() != u }
-                #if DEBUG
-                print("recipes: total=\(rows.count), mine=\(self.myRecipes.count), others=\(self.otherRecipes.count)")
-                #endif
+                //#if DEBUG
+                //print("recipes: total=\(rows.count), mine=\(self.myRecipes.count), others=\(self.otherRecipes.count)")
+                //#endif
 
                 struct FavRow: Decodable { let recipe_id: UUID }
                 let favRows: [FavRow] = try await client

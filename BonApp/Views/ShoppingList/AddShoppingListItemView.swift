@@ -5,10 +5,8 @@ struct AddShoppingListItemView: View {
     
     @Environment(\.dismiss) private var dismiss
     
-    /// ID listy zakupów, do której dodajemy produkty
     let shoppingListId: UUID
     
-    /// Callback wywoływany po poprawnym dodaniu pozycji
     let onAdded: () -> Void
     
     // MARK: - Stan formularza
@@ -44,7 +42,6 @@ struct AddShoppingListItemView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 24) {
-                // Produkt
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Produkt")
                         .font(.headline)
@@ -179,10 +176,8 @@ private struct NewShoppingListItemRow: Encodable {
 
 extension AddShoppingListItemView {
     
-    /// Wyszukiwanie produktów po nazwie.
     @MainActor
     private func searchProducts(matching query: String) async {
-        // Czyścimy wyniki, jeśli użytkownik skasował tekst
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             suggestions = []
@@ -195,28 +190,23 @@ extension AddShoppingListItemView {
         do {
             let client = SupabaseManager.shared.client
 
-            // Pobieramy produkty z bazy (tak jak w spiżarni)
             let rows: [ProductSuggestion] = try await client
                 .from("product")
                 .select("id,name,unit")
                 .execute()
                 .value
 
-            // Filtrowanie po stronie aplikacji, bez użycia `ilike`
             let lower = trimmed.lowercased()
             let filtered = rows.filter { $0.name.lowercased().contains(lower) }
 
-            // Maksymalnie 5 propozycji
             suggestions = Array(filtered.prefix(5))
         } catch {
-            // Nie blokujemy całego widoku, tylko pokazujemy komunikat
             errorMessage = "Nie udało się pobrać produktów: \(error.localizedDescription)"
         }
 
         isSearching = false
     }
     
-    /// Zapisuje wybraną pozycję na liście zakupów (tabela `product_on_list`).
     @MainActor
     private func saveItem() async {
         guard let product = selectedProduct else {
@@ -245,7 +235,6 @@ extension AddShoppingListItemView {
                 .insert(payload)
                 .execute()
             
-            // Powiadom widok nadrzędny i zamknij widok
             onAdded()
             dismiss()
         } catch {

@@ -105,6 +105,7 @@ struct RecipeDetailView: View {
     @State private var loadedCategories: [String] = []
     @State private var isFavorite: Bool = false
     @State private var favoriteMessage: String? = nil
+    @State private var authorName: String? = nil
     @State private var showExecuteAlert: Bool = false
     @State private var executeMessage: String? = nil
 
@@ -132,6 +133,13 @@ struct RecipeDetailView: View {
                         .font(.title)
                         .bold()
                         .foregroundColor(Color("textPrimary"))
+
+                    if let authorName {
+                        Text("Autor: \(authorName)")
+                            .font(.subheadline)
+                            .bold()
+                            .foregroundColor(Color("textSecondary"))
+                    }
 
                     Text("Czas przygotowania: \(recipe.cookTime) min")
                         .font(.subheadline)
@@ -394,6 +402,7 @@ struct RecipeDetailView: View {
             await loadIngredientsAvailability()
             await loadCategoriesFromDB()
             await loadFavoriteStatus()
+            await loadAuthorName()
         }
     }
 
@@ -465,6 +474,26 @@ struct RecipeDetailView: View {
             }
         } catch {
             print("[RecipeDetailView] loadIngredientsAvailability error:", error)
+        }
+    }
+
+    private func loadAuthorName() async {
+        do {
+            struct UserRow: Decodable { let username: String? }
+
+            let row: UserRow = try await SupabaseManager.shared.client
+                .from("users")
+                .select("username")
+                .eq("id", value: recipe.userId)
+                .single()
+                .execute()
+                .value
+
+            await MainActor.run {
+                self.authorName = row.username ?? ""
+            }
+        } catch {
+            print("[RecipeDetailView] loadAuthorName error:", error)
         }
     }
 

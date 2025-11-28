@@ -78,7 +78,7 @@ struct ShoppingListsView: View {
                 }
                 .navigationTitle("Moje listy zakupów")
                 .task { await listsVM.fetchLists() }
-                .onAppear { print("🧾 Loaded lists count: \(listsVM.lists.count)") }
+                //.onAppear { print("Loaded lists count: \(listsVM.lists.count)") }
                 .refreshable { await listsVM.fetchLists() }
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
