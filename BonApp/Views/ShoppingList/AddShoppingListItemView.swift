@@ -51,9 +51,21 @@ struct AddShoppingListItemView: View {
                         .autocorrectionDisabled()
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)
-                        .background(Color(.systemBackground))
+                        .background(Color("textfieldBackground"))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(Color("textfieldBorder"), lineWidth: 1)
+                        )
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .onChange(of: searchText) { oldValue, newValue in
+                            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                            if trimmed.isEmpty {
+                                suggestions = []
+                                return
+                            }
+                            if newValue == selectedProduct?.name {
+                                return
+                            }
                             Task { await searchProducts(matching: newValue) }
                         }
                     
@@ -96,7 +108,7 @@ struct AddShoppingListItemView: View {
                                 }
                             }
                         }
-                        .background(Color(.secondarySystemBackground))
+                        .background(Color("itemsListBackground"))
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
                 }
@@ -111,7 +123,11 @@ struct AddShoppingListItemView: View {
                             .keyboardType(.decimalPad)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 10)
-                            .background(Color(.systemBackground))
+                            .background(Color("textfieldBackground"))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(Color("textfieldBorder"), lineWidth: 1)
+                            )
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         
                         if let unit = selectedProduct?.unit, !unit.isEmpty {
@@ -134,6 +150,7 @@ struct AddShoppingListItemView: View {
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)
+            .background(Color("background").ignoresSafeArea())
             .navigationTitle("Dodaj produkt")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -5,7 +5,6 @@ struct ShoppingListDetailView: View {
     @StateObject private var viewModel: ShoppingListViewModel
     @State private var editingItem: ShoppingListItemDTO? = nil
 
-    @State private var isPresentingSheet = false
 
     private let ownerId: String
     private let shoppingListId: UUID
@@ -96,7 +95,16 @@ struct ShoppingListDetailView: View {
                         .help("Przenieś kupione pozycje do spiżarni")
                     }
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        Button { isPresentingSheet = true } label: { Image(systemName: "plus") }
+                        NavigationLink {
+                            AddShoppingListItemView(
+                                shoppingListId: shoppingListId,
+                                onAdded: {
+                                    Task { await viewModel.fetchItems() }
+                                }
+                            )
+                        } label: {
+                            Image(systemName: "plus")
+                        }
                     }
                 }
                 .task { await viewModel.fetchItems() }
@@ -111,15 +119,6 @@ struct ShoppingListDetailView: View {
                         message: Text(viewModel.error ?? ""),
                         dismissButton: .default(Text("OK")) {
                             viewModel.error = nil
-                        }
-                    )
-                }
-                .sheet(isPresented: $isPresentingSheet) {
-                    AddShoppingListItemView(
-                        shoppingListId: shoppingListId,
-                        onAdded: {
-                            Task { await viewModel.fetchItems() }
-                            isPresentingSheet = false
                         }
                     )
                 }
