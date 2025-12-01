@@ -157,10 +157,10 @@ struct PantryView: View {
                 )
             ) {
                 pantryRowView(for: item)
+                    .background(rowBackground(for: item.id))
+                    .cornerRadius(20)
+                    .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 4)
             }
-            .background(rowBackground(for: item.id))
-            .cornerRadius(20)
-            .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 4)
             .contentShape(Rectangle())
         }
     }

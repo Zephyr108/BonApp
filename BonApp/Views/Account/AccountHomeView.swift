@@ -17,7 +17,7 @@ struct AccountHomeView: View {
                 NavigationLink {
                     ProfileSetupView()
                 } label: {
-                    Label("Edytuj konto", systemImage: "person.crop.circle.badge.pencil")
+                    Label("Edytuj konto", systemImage: "person.crop.circle")
                 }
 
                 NavigationLink {
