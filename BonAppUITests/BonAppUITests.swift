@@ -38,4 +38,28 @@ final class BonAppUITests: XCTestCase {
             XCUIApplication().launch()
         }
     }
+
+    @MainActor
+    func testNavigateToRecipesList() throws {
+        let app = XCUIApplication()
+        app.launch()
+        app.buttons["Przepisy"].tap()
+        XCTAssertTrue(app.navigationBars.element.exists)
+    }
+
+    @MainActor
+    func testOpenSearchView() throws {
+        let app = XCUIApplication()
+        app.launch()
+        app.buttons["Szukaj"].tap()
+        XCTAssertTrue(app.searchFields.element.exists)
+    }
+
+    @MainActor
+    func testOpenFirstRecipeDetails() throws {
+        let app = XCUIApplication()
+        app.launch()
+        app.cells.element(boundBy: 0).tap()
+        XCTAssertTrue(app.staticTexts["Kroki"].exists)
+    }
 }
