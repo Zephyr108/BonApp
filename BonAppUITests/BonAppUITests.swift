@@ -10,30 +10,54 @@ import XCTest
 final class BonAppUITests: XCTestCase {
 
     override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
-
-        // In UI tests it is usually best to stop immediately when a failure occurs.
         continueAfterFailure = false
 
-        // In UI tests it’s important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
-    }
-
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
-    }
-
-    @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
         let app = XCUIApplication()
         app.launch()
 
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
+        // Jeśli widoczny ekran logowania → zaloguj testowego użytkownika
+        if app.textFields["emailField"].exists {
+            loginTestUser(app)
+        }
+
+        // Czekamy aż główny ekran się pojawi po zalogowaniu
+        XCTAssertTrue(
+            app.buttons["Przepisy"].waitForExistence(timeout: 5),
+            "Ekran główny nie pojawił się po starcie aplikacji"
+        )
+    }
+
+    // MARK: - Pomocnicza funkcja logowania testowego użytkownika
+    private func loginTestUser(_ app: XCUIApplication) {
+        let email = "test@example.com"
+        let password = "Test123!"
+
+        let emailField = app.textFields["emailField"]
+        let passwordField = app.secureTextFields["passwordField"]
+        let loginButton = app.buttons["loginButton"]
+
+        XCTAssertTrue(emailField.exists, "Pole email nie istnieje")
+        XCTAssertTrue(passwordField.exists, "Pole hasła nie istnieje")
+
+        emailField.tap()
+        emailField.clearAndTypeText(email)
+
+        passwordField.tap()
+        passwordField.clearAndTypeText(password)
+
+        loginButton.tap()
+    }
+
+    // MARK: - TESTY UI
+
+    @MainActor
+    func testInitialScreenShowsRecipesSection() throws {
+        let app = XCUIApplication()
+        XCTAssertTrue(app.buttons["Przepisy użytkowników"].exists)
     }
 
     @MainActor
     func testLaunchPerformance() throws {
-        // This measures how long it takes to launch your application.
         measure(metrics: [XCTApplicationLaunchMetric()]) {
             XCUIApplication().launch()
         }
@@ -42,7 +66,6 @@ final class BonAppUITests: XCTestCase {
     @MainActor
     func testNavigateToRecipesList() throws {
         let app = XCUIApplication()
-        app.launch()
         app.buttons["Przepisy"].tap()
         XCTAssertTrue(app.navigationBars.element.exists)
     }
@@ -50,7 +73,6 @@ final class BonAppUITests: XCTestCase {
     @MainActor
     func testOpenSearchView() throws {
         let app = XCUIApplication()
-        app.launch()
         app.buttons["Szukaj"].tap()
         XCTAssertTrue(app.searchFields.element.exists)
     }
@@ -58,8 +80,42 @@ final class BonAppUITests: XCTestCase {
     @MainActor
     func testOpenFirstRecipeDetails() throws {
         let app = XCUIApplication()
-        app.launch()
+        XCTAssertTrue(app.cells.element(boundBy: 0).waitForExistence(timeout: 3))
         app.cells.element(boundBy: 0).tap()
         XCTAssertTrue(app.staticTexts["Kroki"].exists)
+    }
+
+    @MainActor
+    func testNavigateToAccountTab() throws {
+        let app = XCUIApplication()
+
+        let kontoTab = app.tabBars.buttons
+            .containing(NSPredicate(format: "label CONTAINS[c] %@", "Konto"))
+            .firstMatch
+
+        guard kontoTab.waitForExistence(timeout: 5) else {
+            throw XCTSkip("Zakładka Konto niedostępna — możliwe że nie jesteś zalogowany.")
+        }
+
+        kontoTab.tap()
+
+        XCTAssertTrue(
+            kontoTab.isSelected ||
+            app.staticTexts["Twoje konto"].waitForExistence(timeout: 3),
+            "Zakładka Konto nie została poprawnie otwarta"
+        )
+    }
+}
+
+
+// MARK: - Przydatne rozszerzenie do czyszczenia pól tekstowych
+extension XCUIElement {
+    func clearAndTypeText(_ text: String) {
+        tap()
+        if let string = value as? String {
+            let deleteString = string.map { _ in XCUIKeyboardKey.delete.rawValue }.joined()
+            typeText(deleteString)
+        }
+        typeText(text)
     }
 }
