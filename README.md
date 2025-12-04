@@ -1,121 +1,111 @@
-# 🍽️ BonApp – Aplikacja Mobilna do Przechowywania Przepisów i List Zakupów
+# 🍽️ BonApp – Nowoczesna aplikacja mobilna do przepisów, list zakupów i zarządzania spiżarnią
 
-**BonApp** to nowoczesna aplikacja mobilna stworzona z użyciem **SwiftUI**, umożliwiająca użytkownikom zarządzanie przepisami kulinarnymi, listą zakupów oraz zawartością spiżarni. Ułatwia planowanie posiłków i organizację produktów spożywczych.
+**BonApp** to aplikacja iOS stworzona w **SwiftUI**, która ułatwia organizację kuchni: dodawanie przepisów, tworzenie list zakupów, zarządzanie produktami w spiżarni oraz odkrywanie rekomendacji.  
+Aplikacja korzysta z **Supabase** jako backendu oraz architektury **MVVM**.
 
 ---
 
-## 🔧 Technologie
+## 🚀 Funkcje aplikacji
 
-**Platforma:**
-- 📱 SwiftUI (iOS)
-- 💾 CoreData (local persistence)
-- 🌐 Localizable.strings (obsługa wielu języków)
+### 🔐 Autoryzacja & konto użytkownika
+- Logowanie i rejestracja przez Supabase Auth  
+- Ekran onboarding + ustawianie profilu  
+- Zarządzanie kontem użytkownika  
 
-**Architektura:**
-- 🧠 MVVM (Model-View-ViewModel)
+### 📚 Przepisy
+- Dodawanie, edycja i przegląd własnych przepisów  
+- Wyszukiwarka  
+- Kategorie, składniki, zdjęcia  
+- Reużywalne komponenty: `RecipeRowView`, `IngredientsListView`
+
+### 🛒 Listy zakupów
+- Tworzenie wielu list  
+- Dodawanie, usuwanie, odhaczanie produktów  
+- Szczegółowy widok listy zakupów  
+
+### 🧺 Spiżarnia / Pantry
+- Dodawanie produktów (nazwa, kategoria, data ważności)  
+- Edycja produktów  
+- Wyświetlanie kategorii  
+
+### 🧠 Rekomendacje
+- Widok rekomendacji: `RecommendationsView`  
+- Logika w `RecommendationsViewModel`  
+
+### 🌍 Wielojęzyczność
+- Obsługa `Localizable.strings`  
+
+---
+
+## 🔧 Technologie i architektura
+
+### Platforma
+- iOS 17+  
+- SwiftUI  
+- Swift 5+
+
+### Backend
+- Supabase Auth + Database  
+- Warstwa komunikacji: `SupabaseManager.swift`
+
+### Architektura
+- MVVM  
+- Struktura katalogów:
+  - `Views/`
+  - `ViewModels/`
+  - `Components/`
+  - `Utils/`
+
+### Testy
+- `BonAppTests`  
+- `BonAppUITests`  
 
 ---
 
 ## 📁 Struktura projektu
 
 ```
-BonApp/
-├── Models/
-│   ├── PantryItem+CoreDataClass.swift
-│   ├── Recipe+CoreDataClass.swift
-│   ├── RecipeStep+CoreDataClass.swift
-│   ├── ShoppingItem+CoreDataClass.swift
-│   └── User+CoreDataClass.swift
-│   └── (pliki +Properties.swift)
-├── Resources/
-│   └── Localizable.strings
-├── Utils/
-│   ├── Extensions.swift
-│   ├── GestureHandler.swift
-│   ├── ImagePicker.swift
-│   └── Validators.swift
-├── ViewModels/
-│   ├── AuthViewModel.swift
-│   ├── PantryViewModel.swift
-│   ├── RecipeViewModel.swift
-│   ├── RecommendationsViewModel.swift
-│   ├── SettingsViewModel.swift
-│   └── ShoppingListViewModel.swift
-├── Views/
-│   ├── Account/
-│   │   └── SettingsView.swift
-│   ├── Auth/
-│   │   ├── LoginView.swift
-│   │   ├── ProfileSetupView.swift
-│   │   └── RegistrationView.swift
-│   ├── Components/
-│   │   ├── CategoryFilterView.swift
-│   │   ├── IngredientsListView.swift
-│   │   └── RecipeRowView.swift
-│   ├── Pantry/
-│   │   ├── AddPantryItemView.swift
-│   │   ├── EditPantryItemView.swift
-│   │   └── PantryView.swift
-│   ├── Recipes/
-│   │   ├── AddRecipeView.swift
-│   │   ├── EditRecipeView.swift
-│   │   ├── RecipeDetailView.swift
-│   │   ├── RecipeListView.swift
-│   │   └── RecipeSearchView.swift
-│   ├── Recommendations/
-│   │   └── RecommendationsView.swift
-│   └── ShoppingList/
-│       ├── AddShoppingItemView.swift
-│       ├── EditShoppingItemView.swift
-│       └── ShoppingListView.swift
-├── Assets/
-├── LaunchScreen.storyboard
+BonApp
+│
 ├── BonAppApp.swift
 ├── ContentView.swift
-└── Persistence.swift
+├── SupabaseManager.swift
+│
+├── ViewModels/
+│
+├── Views/
+│   ├── Auth/
+│   ├── Account/
+│   ├── Recipes/
+│   ├── Pantry/
+│   ├── ShoppingList/
+│   ├── Recommendations/
+│   └── Components/
+│
+└── Utils/
 ```
 
 ---
 
-## 🚀 Uruchomienie aplikacji
-
-### 📱 Wymagania
-
-- Xcode 14 lub nowszy
-- iOS 15+
-
-### ▶️ Kroki
-
-1. Otwórz `BonApp.xcodeproj` lub `BonApp.xcworkspace` w Xcode.
-2. Wybierz emulator lub podłączone urządzenie.
-3. Kliknij ▶️ **Run**.
-
-> ℹ️ Brak backendu – dane przechowywane są lokalnie na urządzeniu użytkownika.
+## 🧪 Plany rozwoju
+- Powiadomienia o kończących się produktach  
+- Inteligentne filtrowanie przepisów na podstawie spiżarni  
+- Tryb gotowania krok-po-kroku  
+- Udostępnianie list zakupów  
+- Planowanie posiłków  
 
 ---
 
-## 👤 Funkcjonalności użytkownika
+## ▶️ Uruchomienie projektu
 
-1. 🧾 Przeglądanie, dodawanie i edycja przepisów
-2. 🛒 Tworzenie i aktualizowanie listy zakupów
-3. 🥫 Zarządzanie produktami w spiżarni
-4. 🧠 Propozycje potraw na podstawie zawartości spiżarni
-5. 🔐 System logowania i rejestracji (lokalny)
-
----
-
-## 🌱 Możliwe rozszerzenia
-
-- ☁️ Synchronizacja z chmurą (np. Firebase, iCloud)
-- 🧪 Składnikowe filtrowanie przepisów
-- 📅 Planer tygodniowy
-- 🔔 Powiadomienia o kończących się produktach
-- 👨‍🍳 Tryb gotowania (krok po kroku)
+1. Pobierz repozytorium  
+2. Otwórz `BonApp.xcodeproj`  
+3. Uzupełnij w `SupabaseManager.swift`:  
+   - `SUPABASE_URL`  
+   - `SUPABASE_ANON_KEY`  
+4. Uruchom aplikację  
 
 ---
 
 ## 📄 Licencja
-
-Projekt do celów edukacyjnych – jeśli chcesz użyć go komercyjnie, skontaktuj się z autorem 😊
-
----
+Projekt edukacyjny – użycie komercyjne wymaga zgody autora.
