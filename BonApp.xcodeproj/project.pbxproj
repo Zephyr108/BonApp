@@ -13,6 +13,7 @@
 		D354ADB02E5388E900EF3F06 /* Realtime in Frameworks */ = {isa = PBXBuildFile; productRef = D354ADAF2E5388E900EF3F06 /* Realtime */; };
 		D354ADB22E5388E900EF3F06 /* Storage in Frameworks */ = {isa = PBXBuildFile; productRef = D354ADB12E5388E900EF3F06 /* Storage */; };
 		D354ADB52E58970A00EF3F06 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = D354ADB42E58970A00EF3F06 /* Supabase */; };
+		D3844DC22EE2DF5900C283A6 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = D3844DC12EE2DF5900C283A6 /* README.md */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -33,6 +34,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		D3844DC12EE2DF5900C283A6 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		D3D458D72DBFEB1E001C706B /* BonApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BonApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D3D458E92DBFEB1F001C706B /* BonAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BonAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D3D458F32DBFEB1F001C706B /* BonAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BonAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -97,6 +99,7 @@
 		D3D458CE2DBFEB1E001C706B = {
 			isa = PBXGroup;
 			children = (
+				D3844DC12EE2DF5900C283A6 /* README.md */,
 				D3D458D92DBFEB1E001C706B /* BonApp */,
 				D3D458EC2DBFEB1F001C706B /* BonAppTests */,
 				D3D458F62DBFEB1F001C706B /* BonAppUITests */,
@@ -245,6 +248,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D3844DC22EE2DF5900C283A6 /* README.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
