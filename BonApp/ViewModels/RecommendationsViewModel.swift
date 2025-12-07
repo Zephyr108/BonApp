@@ -30,7 +30,6 @@ final class RecommendationsViewModel: ObservableObject {
 
     private let client = SupabaseManager.shared.client
 
-    // paginacja
     private let pageSize = 5
 
     // MARK: - Public API

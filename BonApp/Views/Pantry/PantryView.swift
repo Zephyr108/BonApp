@@ -57,7 +57,7 @@ final class PantryScreenViewModel: ObservableObject {
             let rows: [PantryItemRow] = try await client
                 .from("pantry")
                 .select("id,product_id,quantity,product:product_id(id,name,product_category_id,unit)")
-                .eq("user_id", value: uid) // compare as UUID to avoid type mismatch stalls
+                .eq("user_id", value: uid)
                 .order("id", ascending: true)
                 .limit(500)
                 .execute()

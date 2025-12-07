@@ -262,7 +262,6 @@ final class ShoppingListViewModel: ObservableObject {
             struct Row: Decodable { let id: UUID; let product_id: Int; let quantity: Double }
             struct Existing: Decodable { let id: UUID; let quantity: Double }
 
-            // Pobierz wszystkie kupione pozycje z listy (bez GROUP BY)
             let rows: [Row] = try await client
                 .from("product_on_list")
                 .select("id,product_id,quantity")
@@ -274,7 +273,6 @@ final class ShoppingListViewModel: ObservableObject {
             let hadRows = !rows.isEmpty
             guard hadRows else { return }
 
-            // Ustal aktualne UID
             var effectiveUid = userId
             if effectiveUid == nil || effectiveUid?.isEmpty == true {
                 if let session = try? await client.auth.session {
@@ -283,12 +281,10 @@ final class ShoppingListViewModel: ObservableObject {
             }
             guard let uid = effectiveUid, !uid.isEmpty else { return }
 
-            // Zsumuj ilości tego samego produktu lokalnie
             let aggregated = rows.reduce(into: [Int: Double]()) { partialResult, row in
                 partialResult[row.product_id, default: 0] += row.quantity
             }
 
-            // Dla każdego produktu albo zaktualizuj istniejący rekord w pantry, albo wstaw nowy
             for (productId, totalCount) in aggregated {
                 let existing: [Existing] = try await client
                     .from("pantry")
@@ -316,7 +312,6 @@ final class ShoppingListViewModel: ObservableObject {
                 }
             }
 
-            // Usuń z listy wszystkie kupione pozycje, które przenieśliśmy (po ich id)
             let idsToDelete = rows.map { $0.id }
             if !idsToDelete.isEmpty {
                 _ = try await client
@@ -341,7 +336,6 @@ final class ShoppingListViewModel: ObservableObject {
 
     // MARK: - Delete whole list (when all items bought and moved to pantry)
     func deleteCurrentList() async {
-        // Ustal poprawne UID (najpierw z ownerId, a jeśli puste – z aktualnej sesji)
         var effectiveUid: String? = userId
         if effectiveUid == nil || effectiveUid?.isEmpty == true {
             if let session = try? await client.auth.session {
@@ -357,14 +351,12 @@ final class ShoppingListViewModel: ObservableObject {
         }
 
         do {
-            // Najpierw usuń powiązane pozycje z product_on_list
             _ = try await client
                 .from("product_on_list")
                 .delete()
                 .eq("shopping_list_id", value: shoppingListId)
                 .execute()
 
-            // Następnie usuń samą listę (zabezpieczenie przez user_id)
             _ = try await client
                 .from("shopping_list")
                 .delete()
@@ -455,7 +447,6 @@ final class ShoppingListsViewModel: ObservableObject {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
-        // Ustal poprawne UID (najpierw z ownerId, a jeśli puste – z aktualnej sesji)
         var effectiveUid: String? = userId
         if effectiveUid == nil || effectiveUid?.isEmpty == true {
             if let session = try? await client.auth.session {
@@ -485,7 +476,6 @@ final class ShoppingListsViewModel: ObservableObject {
 
     // MARK: - Delete list
     func deleteList(id: UUID) async {
-        // Ustal poprawne UID (najpierw z ownerId, a jeśli puste – z aktualnej sesji)
         var effectiveUid: String? = userId
         if effectiveUid == nil || effectiveUid?.isEmpty == true {
             if let session = try? await client.auth.session {
@@ -501,7 +491,6 @@ final class ShoppingListsViewModel: ObservableObject {
         }
 
         do {
-            // Remove child rows first to satisfy FK constraints
             _ = try await client
                 .from("product_on_list")
                 .delete()

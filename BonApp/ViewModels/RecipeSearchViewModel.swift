@@ -8,7 +8,6 @@
 import Foundation
 import Supabase
 
-// DTO dla wyników wyszukiwania
 struct SearchRecipeItem: Identifiable, Hashable, Decodable {
     let id: UUID
     let title: String
