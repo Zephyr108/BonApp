@@ -1,6 +1,5 @@
 import SwiftUI
 
-// MARK: - List of shopping lists (parent screen)
 struct ShoppingListsView: View {
     @StateObject private var listsVM: ShoppingListsViewModel
     @State private var isPresentingNewListSheet = false
