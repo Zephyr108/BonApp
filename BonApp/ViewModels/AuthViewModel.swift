@@ -7,7 +7,6 @@ import Foundation
 import Combine
 import Supabase
 
-// MARK: - Helper model for the current user
 struct AppUser: Equatable {
     let id: String
     var email: String
@@ -84,6 +83,29 @@ final class AuthViewModel: ObservableObject {
     init(client: SupabaseClient = SupabaseManager.shared.client) {
         self.client = client
         Task { await refreshAuthState() }
+    }
+
+    // MARK: - Auth error mapping
+    private func mapAuthError(_ error: Error) -> String {
+        let message = error.localizedDescription.lowercased()
+
+        if message.contains("invalid login credentials") {
+            return "Nieprawidłowy adres e-mail lub hasło."
+        }
+
+        if message.contains("email not confirmed") {
+            return "Konto nie zostało jeszcze aktywowane. Sprawdź skrzynkę e-mail."
+        }
+
+        if message.contains("password") {
+            return "Podane hasło jest nieprawidłowe."
+        }
+
+        if message.contains("network") {
+            return "Błąd połączenia z siecią. Sprawdź połączenie internetowe."
+        }
+
+        return "Wystąpił błąd logowania. Spróbuj ponownie później."
     }
 
     // MARK: - Registration
@@ -178,7 +200,7 @@ final class AuthViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Update profile (user metadata, email, password)
+    // MARK: - Update profile
     func updateProfile(
         name: String,
         lastName: String,
@@ -264,7 +286,11 @@ final class AuthViewModel: ObservableObject {
             self.errorMessage = "Błąd sieci (\(urlErr.code.rawValue)): \(urlErr.localizedDescription)"
             print("[Auth] URLError:", urlErr)
         } else {
-            self.errorMessage = lastError?.localizedDescription ?? "Nieznany błąd logowania"
+            if let err = lastError {
+                self.errorMessage = mapAuthError(err)
+            } else {
+                self.errorMessage = "Nieznany błąd logowania"
+            }
             print("[Auth] ERROR:", String(describing: lastError))
         }
     }

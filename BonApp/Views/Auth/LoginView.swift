@@ -58,7 +58,6 @@ struct LoginView: View {
                             await auth.login()
                             print("[LoginView] after login: isAuthenticated=\(auth.isAuthenticated), error=\(auth.errorMessage ?? "nil")")
                             if auth.isAuthenticated {
-                                // dociągnij profil/sesję zanim zamkniesz ekran, żeby ContentView miał już dane
                                 await auth.refreshAuthState()
                                 dismiss()
                             }
