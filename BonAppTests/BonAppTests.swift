@@ -15,7 +15,7 @@ struct BonAppTests {
     @Test("Asynchroniczna operacja kończy się w oczekiwanym czasie")
     func async_operationCompletes() async throws {
         let start = Date()
-        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 sekundy
+        try await Task.sleep(nanoseconds: 100_000_000)
         let end = Date()
 
         let elapsed = end.timeIntervalSince(start)
@@ -187,12 +187,10 @@ struct BonAppTests {
         ]
         var pantry: [PantryItem] = []
 
-        // Oznacz jako kupione
         for i in shoppingList.indices {
             shoppingList[i].isBought = true
         }
 
-        // Przenieś kupione do spiżarni i usuń z listy
         let boughtItems = shoppingList.filter { $0.isBought }
         shoppingList.removeAll(where: { $0.isBought })
 

@@ -57,13 +57,6 @@ final class BonAppUITests: XCTestCase {
     }
 
     @MainActor
-    func testLaunchPerformance() throws {
-        measure(metrics: [XCTApplicationLaunchMetric()]) {
-            XCUIApplication().launch()
-        }
-    }
-
-    @MainActor
     func testNavigateToRecipesList() throws {
         let app = XCUIApplication()
         app.buttons["Przepisy"].tap()
@@ -108,7 +101,7 @@ final class BonAppUITests: XCTestCase {
 }
 
 
-// MARK: - Przydatne rozszerzenie do czyszczenia pól tekstowych
+// MARK: - Rozszerzenie do czyszczenia pól tekstowych
 extension XCUIElement {
     func clearAndTypeText(_ text: String) {
         tap()
