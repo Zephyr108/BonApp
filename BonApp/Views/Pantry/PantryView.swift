@@ -25,10 +25,19 @@ struct PantryView: View {
                 }
             }()
 
-            Text("\(quantityString) \(item.productUnit ?? "")")
-                .font(.subheadline)
-                .foregroundColor(Color("textSecondary"))
-                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack {
+                Text("\(quantityString) \(item.productUnit ?? "")")
+                    .font(.subheadline)
+                    .foregroundColor(Color("textSecondary"))
+
+                Spacer()
+
+                if let categoryId = item.productCategoryId {
+                    Text("Kategoria #\(categoryId)")
+                        .font(.subheadline)
+                        .foregroundColor(Color("textSecondary"))
+                }
+            }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
@@ -182,3 +191,4 @@ struct PantryView_Previews: PreviewProvider {
         PantryView()
     }
 }
+
