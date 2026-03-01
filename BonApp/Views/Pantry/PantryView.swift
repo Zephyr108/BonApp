@@ -7,6 +7,7 @@ struct PantryView: View {
     @StateObject private var viewModel = PantryViewModel()
     @State private var selectedIds: Set<UUID> = []
     @State private var isSelecting = false
+    @State private var categoryNames: [Int: String] = [:]
 
     @ViewBuilder
     private func pantryRowView(for item: PantryItemRow) -> some View {
@@ -33,9 +34,15 @@ struct PantryView: View {
                 Spacer()
 
                 if let categoryId = item.productCategoryId {
-                    Text("Kategoria #\(categoryId)")
+                    let name = categoryNames[categoryId]
+                    Text(name ?? "Kategoria")
                         .font(.subheadline)
                         .foregroundColor(Color("textSecondary"))
+                        .task(id: name == nil ? categoryId : -1) {
+                            if categoryNames[categoryId] == nil {
+                                await fetchCategoryName(id: categoryId)
+                            }
+                        }
                 }
             }
         }
@@ -183,6 +190,27 @@ struct PantryView: View {
 
     private func rowBackground(for id: UUID) -> Color {
         selectedIds.contains(id) && isSelecting ? Color("itemsListBackground").opacity(0.6) : Color("itemsListBackground")
+    }
+
+    @MainActor
+    private func setCategoryName(_ id: Int, _ name: String) {
+        categoryNames[id] = name
+    }
+
+    private func fetchCategoryName(id: Int) async {
+        do {
+            struct CategoryRow: Decodable { let name: String }
+            let row: CategoryRow = try await SupabaseManager.shared.client
+                .from("product_category")
+                .select("name")
+                .eq("id", value: id)
+                .single()
+                .execute()
+                .value
+            await MainActor.run { setCategoryName(id, row.name) }
+        } catch {
+            // optional: keep silent; fallback label will remain generic
+        }
     }
 }
 

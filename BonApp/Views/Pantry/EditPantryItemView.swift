@@ -10,6 +10,8 @@ struct EditPantryItemView: View {
 
     @State private var quantity: String
     @State private var isSaving = false
+    @State private var categoryName: String? = nil
+    @State private var isLoadingCategory = false
 
     init(itemId: UUID, productName: String, unit: String?, quantity: String = "") {
         self.itemId = itemId
@@ -36,6 +38,31 @@ struct EditPantryItemView: View {
                                 .stroke(Color("textfieldBorder"), lineWidth: 1)
                         )
                         .cornerRadius(8)
+
+                    Text("Kategoria")
+                        .foregroundColor(Color("textSecondary"))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    HStack {
+                        if let name = categoryName, !name.isEmpty {
+                            Text(name)
+                                .foregroundColor(Color("textPrimary"))
+                        } else if isLoadingCategory {
+                            ProgressView().tint(Color("textSecondary"))
+                        } else {
+                            Text("—")
+                                .foregroundColor(Color("textSecondary"))
+                        }
+                        Spacer()
+                    }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color("textfieldBackground"))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color("textfieldBorder"), lineWidth: 1)
+                    )
+                    .cornerRadius(8)
 
                     Text("Ilość")
                         .foregroundColor(Color("textSecondary"))
@@ -71,6 +98,7 @@ struct EditPantryItemView: View {
                 }
                 .padding()
             }
+            .task { await loadCategoryName() }
             .background(Color("background").ignoresSafeArea())
             .navigationTitle("Edytuj pozycję spiżarni")
             .navigationBarTitleDisplayMode(.inline)
@@ -96,6 +124,45 @@ struct EditPantryItemView: View {
             } catch {
                 print("Błąd zapisu pozycji spiżarni: \(error.localizedDescription)")
             }
+        }
+    }
+
+    private func loadCategoryName() async {
+        isLoadingCategory = true
+        defer { isLoadingCategory = false }
+        do {
+            struct PantryRow: Decodable { let product_id: Int }
+            let pantry: PantryRow = try await SupabaseManager.shared.client
+                .from("pantry")
+                .select("product_id")
+                .eq("id", value: itemId)
+                .single()
+                .execute()
+                .value
+
+            struct ProductRow: Decodable { let product_category_id: Int? }
+            let product: ProductRow = try await SupabaseManager.shared.client
+                .from("product")
+                .select("product_category_id")
+                .eq("id", value: pantry.product_id)
+                .single()
+                .execute()
+                .value
+
+            guard let catId = product.product_category_id else { return }
+
+            struct CategoryRow: Decodable { let name: String }
+            let category: CategoryRow = try await SupabaseManager.shared.client
+                .from("product_category")
+                .select("name")
+                .eq("id", value: catId)
+                .single()
+                .execute()
+                .value
+
+            await MainActor.run { self.categoryName = category.name }
+        } catch {
+            // ignore errors; category stays nil
         }
     }
 }
